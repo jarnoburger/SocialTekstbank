@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block titel %}{{ w.naam }} · SocialTekstbank{% endblock %}
+{% block inhoud %}
+<p class="klein"><a href="{{ url_for('lokaal', merk=w.merk) }}">← {{ w.merk }}</a> · <span class="muted">{{ w.pad }}</span></p>
+<h1>{{ w.naam }} {% if w.jaar %}<span class="muted">({{ w.jaar }})</span>{% endif %}</h1>
+<p class="klein">
+  {{ w.n_img }} foto's · {{ w.n_vid }} video's · {{ w.n_lokaal }} lokaal aanwezig
+  {% if w.yml.rol %} · rol: {{ w.yml.rol }}{% endif %}
+  {% if w.yml.discipline %} · {{ w.yml.discipline }}{% endif %}
+</p>
+
+{% if not w.los %}
+<details class="kaart klein" style="margin-bottom:10px"><summary>Mapnaam en jaar wijzigen</summary>
+<form method="post" action="{{ url_for('werk_hernoem', pid=w.pid) }}" style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-top:8px">
+  <div style="flex:2;min-width:220px"><label>Mapnaam</label><input type="text" name="mapnaam" value="{{ w.mapnaam }}" placeholder="JJJJ Naam"></div>
+  <div style="flex:1;min-width:120px"><label>Jaar (in _project.yml)</label><input type="text" name="jaar" value="{{ w.yml.get('jaar','') }}" placeholder="2017 of 2015-2017"></div>
+  <button>Opslaan</button>
+  <div class="muted" style="flex-basis:100%">Conventie: <code>JJJJ Naam</code> of <code>JJJJ-JJJJ Naam</code>. Koppelingen verhuizen mee; verwijzingen buiten de app (INDEX.md, portfolio.py) niet.</div>
+</form></details>
+{% endif %}
+<form method="post">
+<h2>Tekst bij dit werk <span class="muted klein">→ {{ w.pad }}\_tekst.md</span></h2>
+{% if not w.los %}
+<div class="veld breed" style="margin-bottom:14px">
+  <label for="tw">Trefwoorden voor koppelen</label><small>Komma's. Woorden die in captions over dit werk voorkomen (bijv. resolume, artnet, ledmapping). Staat in _project.yml.</small>
+  <input type="text" id="tw" name="trefwoorden" value="{{ w.yml.get('trefwoorden','') }}">
+</div>
+<div class="veld" style="margin-bottom:14px;max-width:320px">
+  <label for="pr">Promotie-status</label><small>Online-koppelingen tellen automatisch als "online".</small>
+  <select id="pr" name="promotie">
+    {% for p in ['', 'te promoten', 'deels', 'gepromoot', 'niet promoten'] %}<option value="{{ p }}" {{ 'selected' if w.promotie == p }}>{{ p or '— onbekend —' }}</option>{% endfor %}
+  </select>
+</div>
+{% endif %}
+<div class="velden">
+{% for naam, hint in velden %}
+  <div class="veld {{ 'breed' if naam in ('Lang','Beeldbeschrijving') }}">
+    <label for="v{{ loop.index }}">{{ naam }}</label><small>{{ hint }}</small>
+    <textarea id="v{{ loop.index }}" name="veld_{{ naam }}" {% if naam in ('Titel','Jaar en plek','Hashtags') %}style="min-height:40px"{% endif %}>{{ tekst.velden.get(naam, '') }}</textarea>
+  </div>
+{% endfor %}
+</div>
+
+{% if gekoppeld %}
+<h2>Gekoppelde posts ({{ gekoppeld|length }})</h2>
+{% for p in gekoppeld %}
+<div class="kaart" style="margin-bottom:8px">
+  <span class="chip">{{ p.platform|upper }}</span> {{ p.account }} · {{ p.timestamp|datum }} · <a href="{{ p.permalink }}" target="_blank">open</a>
+  <div class="caption klein" style="white-space:pre-wrap;margin-top:6px">{{ p.caption or '⚠ geen caption' }}</div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if tekst.eerder %}
+<h2>Eerdere captions ({{ tekst.eerder|length }})</h2>
+{% for e in tekst.eerder %}<div class="kaart klein" style="margin-bottom:6px"><div class="muted">{{ e.kop }}</div><div style="white-space:pre-wrap">{{ e.tekst }}</div></div>{% endfor %}
+{% endif %}
+
+<h2>Media en tekst per bestand <span class="muted klein">(optioneel, bijv. een alt-tekst of onderschrift)</span></h2>
+{% if w.n_lokaal < (w.n_img + w.n_vid) %}
+<p class="klein muted">☁ = staat alleen in OneDrive. Previews laden downloadt die bestanden.
+  <a href="?laad=1{% if alles %}&alles=1{% endif %}">Previews laden voor dit werk</a></p>
+{% endif %}
+<div class="mediagrid">
+{% for m in media %}
+  {% set idx = w.media.index(m) %}
+  <div class="media">
+    <img loading="lazy" src="{{ url_for('thumb', pid=w.pid, idx=idx, laad=request.args.get('laad','')) }}" alt="">
+    <div class="info">{{ m.rel }}{% if m.cloud %} ☁{% endif %}</div>
+    <textarea name="pb_{{ m.rel }}" placeholder="tekst bij dit bestand…">{{ tekst.per_bestand.get(m.rel, '') }}</textarea>
+  </div>
+{% endfor %}
+</div>
+{% if not alles and w.media|length > media|length %}
+<p><a href="?alles=1">Toon alle {{ w.media|length }} bestanden</a></p>
+{% endif %}
+
+<div class="sticky-opslaan">
+  <button class="primair" type="submit">Opslaan</button>
+  <span class="muted klein">Schrijft naar _tekst.md in de projectmap (ook in elke editor te openen)</span>
+</div>
+</form>
+
+{% if voorstellen %}
+<h2>Online posts die hier mogelijk bij horen</h2>
+{% for g, score, redenen in voorstellen %}
+<div class="voorstel">
+  <div><span class="chip">{{ g.soort }}</span> {{ g.accounts|join(', ') }} · {{ g.start|datum }} · {{ (g.captions[0] if g.captions else '')|kort(110) or '⚠ geen caption' }}
+    <div class="muted klein">{{ redenen|join(' · ') }}</div></div>
+  <form class="inline" method="post" action="{{ url_for('koppel') }}">
+    {% for k in g['keys'] %}<input type="hidden" name="post_key" value="{{ k }}">{% endfor %}
+    <input type="hidden" name="pid" value="{{ w.pid }}">
+    <button>Koppel{% if g['keys']|length > 1 %} ({{ g['keys']|length }}){% endif %}</button></form>
+</div>
+{% endfor %}
+{% endif %}
+
+<form method="post" action="{{ url_for('actie_hash_werk', pid=w.pid) }}" style="margin-top:20px">
+  <button title="Vergelijkt de foto's van dit werk met alle online posts">Beelden van dit werk vergelijken met online posts</button>
+  <span class="muted klein">Downloadt cloud-only foto's van dit werk (max 200).</span>
+</form>
+{% endblock %}

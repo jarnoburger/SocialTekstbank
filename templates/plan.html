@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block titel %}Plannen · {{ w.mapnaam }}{% endblock %}
+{% block inhoud %}
+<style>
+.pl-nav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.pl-groot{font-size:17px;padding:10px 20px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+.pl-groot.primair{background:var(--accent);border-color:var(--accent);color:#fff}
+.pl-groot.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.pl-groot:disabled{opacity:.35;cursor:default}
+.pl-kaart{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;touch-action:pan-y}
+.pl-gepost{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:10px 0 14px;max-width:700px}
+.pl-gepost div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--bg)}
+.pl-gepost div.ja{border-color:var(--ok)}
+.pl-gepost b{display:block}
+.pl-beelden{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:14px}
+.pl-beelden img{height:170px;border-radius:8px;cursor:zoom-in;background:var(--chip);flex:none}
+.pl-tekst{width:100%;min-height:11rem;font:16px/1.5 system-ui,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg);
+  border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.pl-ht{width:100%;font:15px system-ui;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 12px}
+.pl-checks{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+.pl-checks label{display:flex;align-items:center;gap:8px;font-size:16px;padding:10px 14px;border:1px solid var(--line);border-radius:9px;
+  background:var(--bg);cursor:pointer;user-select:none}
+.pl-checks input{width:20px;height:20px}
+.pl-checks label.niet{border-color:var(--bad)}
+.pl-zoom{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:50}
+.pl-zoom img{max-width:94vw;max-height:94vh}
+</style>
+
+<form method="post" id="f">
+<div class="pl-nav">
+  <button class="pl-groot" name="actie" value="vorige" {{ 'disabled' if not vorige }}>← Vorige</button>
+  <b style="font-size:17px">{{ positie[0] }} / {{ positie[1] }}</b>
+  <button class="pl-groot" name="actie" value="volgende" {{ 'disabled' if not volgende }}>Volgende →</button>
+  <span class="muted">nog te beoordelen: {{ tel.open }} van {{ tel.alle }} werken</span>
+  <span style="margin-left:auto">
+    <a class="knop {{ 'primair' if filt=='open' }}" href="{{ url_for('plan_werk', pid=w.pid, filter='open') }}">alleen open</a>
+    <a class="knop {{ 'primair' if filt=='alle' }}" href="{{ url_for('plan_werk', pid=w.pid, filter='alle') }}">alle</a>
+    <a class="knop" href="{{ url_for('planning') }}">Planning →</a>
+  </span>
+</div>
+
+<div class="pl-kaart" id="kaart">
+  <h1 style="margin:0">{{ w.mapnaam }}
+    <span class="muted klein">· {{ w.merk }}{% if it.klaar %} · ✓ klaar{% endif %}{% if status == 'overslaan' %} · caption op "niet posten"{% endif %}</span></h1>
+
+  <div class="pl-gepost">
+  {% for d, naam, pf, acc in doelen %}
+    {% set ps = gepost[d] %}
+    <div class="{{ 'ja' if ps }}"><b>{{ naam }}</b>
+      {% if ps %}✓ {{ ps|length }}× · laatst {{ ps[-1].timestamp[:10] }}
+        {% for p in ps %} <a href="{{ p.permalink }}" target="_blank" rel="noopener">↗{{ loop.index }}</a>{% endfor %}
+      {% else %}<span class="muted">nog niet gepost</span>{% endif %}
+    </div>
+  {% endfor %}
+  </div>
+  {% if ander_merk %}<p class="muted klein">Staat ook op het andere merk:
+    {% for p in ander_merk %}<a href="{{ p.permalink }}" target="_blank" rel="noopener">{{ p.account }} {{ p.timestamp[:10] }}</a>{{ ', ' if not loop.last }}{% endfor %}</p>{% endif %}
+
+  {% if beelden %}
+  <div class="pl-beelden">{% for b in beelden %}<img src="{{ b }}" loading="lazy" onclick="zoom(this.src)">{% endfor %}</div>
+  {% else %}<p class="muted">Geen lokale beelden (alleen video of in de cloud).</p>{% endif %}
+
+  <label class="muted klein">Tekst (Engels) — wordt bij Klaar / Volgende / Vorige opgeslagen in _tekst.md</label>
+  <textarea class="pl-tekst" name="caption_en">{{ caption_en }}</textarea>
+  <label class="muted klein">Hashtags</label>
+  <input class="pl-ht" name="hashtags" value="{{ hashtags|replace('\n', ' ') }}">
+  {% if caption_nl %}<details style="margin-top:8px"><summary class="muted">Nederlandse caption (alleen ter info)</summary>
+    <div style="white-space:pre-wrap;padding:6px 0">{{ caption_nl }}</div></details>{% endif %}
+
+  <div class="pl-checks">
+  {% for d, naam, pf, acc in doelen %}
+    <label><input type="checkbox" class="doel" name="doel_{{ d }}" value="1" {{ 'checked' if d in it.doelen }}> Posten op {{ naam }}</label>
+  {% endfor %}
+    <label class="niet"><input type="checkbox" id="niet" name="niet" value="1" {{ 'checked' if it.niet }}> Verder niet posten</label>
+  </div>
+  {% if it.voorstel %}<p class="muted klein">Vinkjes zijn een voorstel: eigen merk, waar nog niets staat.</p>{% endif %}
+
+  <div class="pl-nav" style="margin:6px 0 0">
+    <button class="pl-groot ok" name="actie" value="klaar">✓ Klaar</button>
+    <button class="pl-groot" name="actie" value="opslaan">Opslaan</button>
+    {% if it.klaar %}<button class="pl-groot" name="actie" value="heropen">Heropen</button>{% endif %}
+    <a class="klein" style="margin-left:auto" href="{{ url_for('caption_werk', pid=w.pid) }}">alle caption-velden</a>
+  </div>
+</div>
+</form>
+<p class="muted klein">Swipe links = volgende, rechts = vorige · toetsen ← → (buiten het tekstvak).</p>
+<div class="pl-zoom" id="zoom" onclick="this.style.display='none'"><img id="zoomimg"></div>
+
+<script>
+const f = document.getElementById('f');
+function ga(actie) {
+  const b = f.querySelector(`button[value="${actie}"]`);
+  if (b && !b.disabled) b.click();
+}
+function zoom(src) { document.getElementById('zoomimg').src = src; document.getElementById('zoom').style.display = 'flex'; }
+const niet = document.getElementById('niet');
+function nietSync() { document.querySelectorAll('.doel').forEach(c => { c.disabled = niet.checked; if (niet.checked) c.checked = false; }); }
+niet.addEventListener('change', nietSync); nietSync();
+// disabled checkboxen worden niet verstuurd; dat is de bedoeling bij "niet posten"
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input,textarea')) return;
+  if (e.key === 'ArrowRight') ga('volgende');
+  if (e.key === 'ArrowLeft') ga('vorige');
+});
+let x0 = null, y0 = null;
+const kaart = document.getElementById('kaart');
+kaart.addEventListener('touchstart', e => {
+  if (e.target.closest('textarea,input,.pl-beelden')) { x0 = null; return; }
+  x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
+}, {passive: true});
+kaart.addEventListener('touchend', e => {
+  if (x0 === null) return;
+  const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+  if (Math.abs(dx) > 80 && Math.abs(dx) > 2 * Math.abs(dy)) ga(dx < 0 ? 'volgende' : 'vorige');
+  x0 = null;
+});
+</script>
+{% endblock %}

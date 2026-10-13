@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block titel %}Publiceer · {{ w.mapnaam }}{% endblock %}
+{% block inhoud %}
+<style>
+.ps-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.ps-tabs a{flex:1;min-width:150px;padding:9px 13px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink)}
+.ps-tabs a.actief{border:2px solid var(--accent)}
+.ps-nav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.ps-groot{font-size:16px;padding:9px 18px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+.ps-groot.primair{background:var(--accent);border-color:var(--accent);color:#fff}
+.ps-groot.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.ps-groot.uit{opacity:.35;pointer-events:none}
+.ps-raster{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:16px}
+@media (max-width:1000px){.ps-raster{grid-template-columns:1fr}}
+.ps-blok{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:14px 16px;margin-bottom:14px}
+.ps-blok h2{margin:0 0 10px;font-size:16px}
+.ps-beelden{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.ps-beeld{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px}
+.ps-beeld img{width:100%;height:150px;object-fit:cover;border-radius:6px;cursor:zoom-in;background:var(--chip)}
+.ps-beeld .nr{font-weight:700}
+.ps-beeld .alt{font-size:13px;color:var(--ink);margin:4px 0}
+.ps-mini{font-size:13px;padding:3px 8px;border-radius:6px;border:1px solid var(--line);background:var(--chip);color:var(--ink);cursor:pointer}
+.ps-tekst{white-space:pre-wrap;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:16px;line-height:1.5}
+.ps-kopie{font-size:17px;padding:11px 16px;margin-top:10px;border-radius:8px;border:0;background:var(--accent);color:#fff;cursor:pointer;width:100%}
+.ps-kopie.ok,.ps-mini.ok{background:var(--ok);color:#fff;border-color:var(--ok)}
+.ps-stappen{margin:0;padding-left:20px}
+.ps-stappen li{margin:3px 0}
+.ps-zoom{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:50}
+.ps-zoom img{max-width:94vw;max-height:94vh}
+</style>
+
+<div class="ps-tabs">
+{% for t in tabs %}
+  <a href="{{ url_for('posten', doel=t.doel) }}" class="{{ 'actief' if t.doel==doel }}"><b>{{ t.naam }}</b><br>
+    <span class="klein">{{ t.open }} te posten · {{ t.totaal }} gepland</span></a>
+{% endfor %}
+</div>
+
+<div class="ps-nav">
+  <a class="ps-groot {{ '' if vorige else 'uit' }}" id="vorige" href="{{ url_for('post_werk', doel=doel, pid=vorige) if vorige else '#' }}">← Vorige</a>
+  <b style="font-size:17px">{{ naam }} · {{ positie[0] }} / {{ positie[1] }}</b>
+  <a class="ps-groot {{ '' if volgende else 'uit' }}" id="volgende" href="{{ url_for('post_werk', doel=doel, pid=volgende) if volgende else '#' }}">Volgende →</a>
+  {% if gepost %}<span style="color:var(--ok)">✓ gepost op {{ gepost[:10] }}</span>{% endif %}
+  <a class="knop" style="margin-left:auto" href="{{ url_for('planning', doel=doel) }}">← Planning</a>
+</div>
+
+<h1 style="margin:0 0 4px">{{ w.mapnaam }}</h1>
+<p class="muted" style="margin:0 0 12px">{{ account }}{% if plek %} · {{ plek }}{% endif %} ·
+  <a href="{{ url_for('plan_werk', pid=w.pid, filter='alle') }}">tekst aanpassen</a></p>
+
+<div class="ps-raster">
+  <div>
+    <div class="ps-blok">
+      <h2>Foto's ({{ beelden|length }}) — in deze volgorde
+        <button class="ps-mini" style="float:right" onclick="openMap(this)">📂 Open map</button></h2>
+      {% if beelden %}
+      <div class="ps-beelden">
+      {% for b in beelden %}
+        <div class="ps-beeld">
+          {% if b.type == 'video' %}<video src="{{ b.url }}#t=1" preload="metadata" controls muted style="width:100%;height:150px;object-fit:cover;border-radius:6px;background:var(--chip)"></video>
+          {% else %}<img src="{{ b.url }}" loading="lazy" onclick="zoom('{{ b.origineel or b.url }}')">{% endif %}
+          <div><span class="nr">{{ loop.index }}</span> {% if b.nieuw %}<span style="color:var(--ok)">★ nieuw</span>{% endif %} <span class="muted klein">{{ b.naam[:38] }}</span></div>
+          {% if b.alt %}<div class="alt" id="alt{{ loop.index }}">{{ b.alt }}</div>
+            <button class="ps-mini" onclick="kopieer(this,'alt{{ loop.index }}')">📋 alt-tekst</button>{% endif %}
+          {% if b.origineel %}<a class="ps-mini" href="{{ b.origineel }}?dl=1">⬇ origineel</a>{% endif %}
+        </div>
+      {% endfor %}
+      </div>
+      {% else %}<p class="muted">Geen beelden in de index — gebruik 📂 Open map.</p>{% endif %}
+    </div>
+  </div>
+
+  <div>
+    <div class="ps-blok">
+      <h2>Tekst</h2>
+      <div class="ps-tekst" id="tekst">{{ tekst }}</div>
+      <button class="ps-kopie" onclick="kopieer(this,'tekst')">📋 Kopieer tekst</button>
+    </div>
+
+    {% if platform == 'ig' and handles %}
+    <div class="ps-blok">
+      <h2>Taggen op de foto / samenwerking</h2>
+      {% for h in handles %}<span id="h{{ loop.index }}">{{ h }}</span>
+        <button class="ps-mini" onclick="kopieer(this,'h{{ loop.index }}')">📋</button>{{ ' · ' if not loop.last }}{% endfor %}
+    </div>
+    {% endif %}
+    {% if platform == 'fb' and fb_profielen %}
+    <div class="ps-blok">
+      <h2>Personen om te taggen (FB)</h2>
+      {% for p in fb_profielen %}<div>{{ p.wie }} — <a href="{{ p.url if p.url.startswith('http') else 'https://' ~ p.url }}" target="_blank" rel="noopener">{{ p.url }}</a></div>{% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="ps-blok">
+      <h2>Stappen</h2>
+      <ol class="ps-stappen">
+        <li>📂 Open map en kies de foto's (volgorde hierboven).</li>
+        <li>Open {{ 'Instagram' if platform == 'ig' else 'Facebook' }}:
+          {% if platform == 'ig' %}<a href="https://www.instagram.com/" target="_blank" rel="noopener">instagram.com</a>
+          {% else %}<a href="https://business.facebook.com/" target="_blank" rel="noopener">Meta Business Suite</a>{% endif %}
+          — log in als <b>{{ account }}</b>.</li>
+        <li>Plak de tekst{% if beelden|selectattr('alt')|list %}, zet de alt-teksten per foto{% endif %}{% if handles and platform=='ig' %}, tag {{ handles|join(', ') }}{% endif %}.</li>
+        <li>Na plaatsen: klik hieronder ✓ Gepost. Zijn alle geplande plekken gepost, dan gaat de map vanzelf naar <code>_Promoted</code>.</li>
+      </ol>
+      <button class="ps-groot ok" style="width:100%;margin-top:10px" id="gepostknop" onclick="gepost({{ 'false' if gepost else 'true' }})">
+        {{ '↺ Toch niet gepost' if gepost else '✓ Gepost — naar volgende' }}</button>
+    </div>
+  </div>
+</div>
+<div class="ps-zoom" id="zoom" onclick="this.style.display='none'"><img id="zoomimg"></div>
+
+<script>
+async function kopieer(knop, id) {
+  const t = document.getElementById(id).innerText, oud = knop.textContent;
+  try { await navigator.clipboard.writeText(t); }
+  catch (e) { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+  knop.classList.add('ok'); knop.textContent = '✓'; setTimeout(() => { knop.classList.remove('ok'); knop.textContent = oud; }, 1800);
+}
+function zoom(src) { document.getElementById('zoomimg').src = src; document.getElementById('zoom').style.display = 'flex'; }
+async function openMap(knop) {
+  const r = await fetch('{{ url_for("actie_open_map", pid=w.pid) }}', {method: 'POST'});
+  knop.textContent = r.ok ? '📂 geopend' : '📂 lukt niet';
+}
+async function gepost(aan) {
+  const r = await fetch('{{ url_for("planning") }}', {method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({doel: '{{ doel }}', gepost: '{{ w.pid }}', aan})});
+  if (!r.ok) { document.getElementById('gepostknop').textContent = 'Opslaan mislukt'; return; }
+  const res = await r.json();
+  if (res.fout) { document.getElementById('gepostknop').textContent = '✓ gepost, maar ' + res.fout; return; }
+  if (aan) {
+    location.href = '{{ url_for("post_werk", doel=doel, pid=volgende_open) if volgende_open else url_for("posten", doel=doel) }}';
+  } else {
+    location.href = '{{ url_for("post_werk", doel=doel, pid="PIDX") }}'.replace('PIDX', res.pid || '{{ w.pid }}');
+  }
+}
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input,textarea')) return;
+  const a = e.key === 'ArrowRight' ? 'volgende' : e.key === 'ArrowLeft' ? 'vorige' : null;
+  const el = a && document.getElementById(a);
+  if (el && !el.classList.contains('uit')) location.href = el.href;
+});
+</script>
+{% endblock %}

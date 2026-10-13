@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block titel %}Review · SocialTekstbank{% endblock %}
+{% block inhoud %}
+<h1>Review: beeld + Claude-tekst + huidige tekst</h1>
+<p class="klein muted">Per werk: klopt mijn beschrijving van de beelden, en hoe verhoudt die zich tot de caption die online staat?
+Status komt in <code>_project.yml</code> → <code>review:</code> (ok / aangepast / fout).</p>
+
+<div class="filters">
+  {% for f, label in [('open','Te beoordelen'),('twijfel','Met twijfel'),('ok','Akkoord'),('fout','Klopt niet'),('geen','Zonder beschrijving'),('alle','Alle')] %}
+  <a href="{{ url_for('review_lijst', filter=f, merk=merk) }}" class="{{ 'actief' if filt==f }}">{{ label }} ({{ tel[f] }})</a>
+  {% endfor %}
+  <span class="muted">·</span>
+  <a href="{{ url_for('review_lijst', filter=filt) }}" class="{{ 'actief' if not merk }}">Beide merken</a>
+  {% for m in merken %}<a href="{{ url_for('review_lijst', filter=filt, merk=m) }}" class="{{ 'actief' if merk==m }}">{{ m }}</a>{% endfor %}
+</div>
+
+{% if rijen %}
+<p><a class="knop primair" href="{{ url_for('review', pid=rijen[0].w.pid, merk=merk) }}">▶ Start bij de eerste ({{ rijen|length }})</a></p>
+<table>
+<tr><th>Werk</th><th>Jaar</th><th>Merk</th><th>Beelden</th><th>Status</th><th>Twijfel</th></tr>
+{% for r in rijen %}
+<tr>
+  <td><a href="{{ url_for('review', pid=r.w.pid, merk=merk) }}">{{ r.w.mapnaam }}</a></td>
+  <td>{{ r.w.jaar or '?' }}</td>
+  <td>{{ r.w.merk }}</td>
+  <td>{{ r.n_beelden or '–' }}</td>
+  <td>{% if r.status == 'ok' %}<span class="chip ok">✓ ok</span>{% elif r.status == 'aangepast' %}<span class="chip ok">✎ aangepast</span>{% elif r.status == 'fout' %}<span class="chip nee">✗ klopt niet</span>{% elif not r.heeft_tekst %}<span class="chip">geen tekst</span>{% else %}<span class="chip warn">open</span>{% endif %}</td>
+  <td class="klein">{{ r.twijfel|kort(140) }}</td>
+</tr>
+{% endfor %}
+</table>
+{% else %}
+<p class="muted">Niets in deze selectie.</p>
+{% endif %}
+{% endblock %}

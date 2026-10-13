@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block titel %}Verplaats-markeringen{% endblock %}
+{% block inhoud %}
+<h1>Verplaats-markeringen <span class="muted klein">{{ rijen|length }} gemarkeerd · alleen gemarkeerd, nog niet uitgevoerd</span></h1>
+<p class="muted klein">Aanpassen of wissen doe je in Review bij het werk zelf (veld onder het beeld leegmaken = markering weg). Claude voert ze later in één keer uit, eerst als proefrun.</p>
+{% if not rijen %}<p class="muted">Nog niets gemarkeerd.</p>{% else %}
+<table>
+<tr><th>Van werk</th><th>Item</th><th>Naar</th><th>Gemarkeerd</th></tr>
+{% for r in rijen %}
+<tr>
+  <td><a href="{{ url_for('review', pid=r.van) }}">{{ r.van_map }}</a>{% if not r.van_ok %} <span class="chip nee">werk bestaat niet meer</span>{% endif %}</td>
+  <td class="klein">{% if r.iid.startswith('post:') %}<span class="chip">post</span> {{ r.iid[5:] }}{% else %}<span class="chip">lokaal</span> {{ r.iid.split(':',2)[2] }}{% endif %}</td>
+  <td>{% if r.nieuw %}<span class="chip warn">nieuw werk</span> {{ r.naar_map }}{% else %}<a href="{{ url_for('review', pid=r.naar) }}">{{ r.naar_map }}</a>{% if not r.naar_ok %} <span class="chip nee">bestaat niet meer</span>{% endif %}{% endif %} <span class="muted klein">{{ r.merk }}</span></td>
+  <td class="muted klein">{{ r.op[:16].replace('T',' ') }}</td>
+</tr>
+{% endfor %}
+</table>
+{% endif %}
+{% endblock %}

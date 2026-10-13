@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block inhoud %}
+<h1>Lokaal: werken in je promotiemappen</h1>
+<div class="filters">
+  <a href="{{ url_for('lokaal', filter=filt) }}" class="{{ 'actief' if not merk }}">Alle merken</a>
+  {% for m in merken %}<a href="{{ url_for('lokaal', merk=m, filter=filt) }}" class="{{ 'actief' if merk==m }}">{{ m }}</a>{% endfor %}
+  <span class="muted">|</span>
+  <a href="{{ url_for('lokaal', merk=merk) }}" class="{{ 'actief' if not filt }}">Alles</a>
+  <a href="{{ url_for('lokaal', merk=merk, filter='gaten') }}" class="{{ 'actief' if filt=='gaten' }}">Niet compleet</a>
+  <a href="{{ url_for('lokaal', merk=merk, filter='leeg') }}" class="{{ 'actief' if filt=='leeg' }}">Geen tekst</a>
+  <span class="muted">|</span>
+  <a href="{{ url_for('lokaal', merk=merk, filter='te_posten') }}" class="{{ 'actief' if filt=='te_posten' }}">Nog te posten</a>
+  <a href="{{ url_for('lokaal', merk=merk, filter='online') }}" class="{{ 'actief' if filt=='online' }}">Online (gekoppeld)</a>
+  <a href="{{ url_for('lokaal', merk=merk, filter='ongekoppeld') }}" class="{{ 'actief' if filt=='ongekoppeld' }}" title="Volgens yml gepromoot, maar nog geen post gekoppeld">Gepromoot, niet gekoppeld</a>
+  <span class="muted klein">{{ rijen|length }} werken</span>
+</div>
+<table>
+<tr><th>Merk</th><th>Werk</th><th>Jaar</th><th>Promotie</th><th>Media</th><th>Tekst</th><th>Posts</th></tr>
+{% for w, n_posts in rijen %}
+<tr>
+  <td>{{ w.merk }}</td>
+  <td><a href="{{ url_for('werk', pid=w.pid) }}">{{ w.naam }}</a></td>
+  <td>{{ w.jaar }}</td>
+  <td class="klein">{% if w.los %}<span class="muted">–</span>
+    {% elif n_posts %}<span class="chip ok">online</span>
+    {% elif w.promotie == 'gepromoot' %}<span class="chip warn" title="yml zegt gepromoot, maar geen post gekoppeld">gepromoot?</span>
+    {% elif w.promotie == 'te promoten' %}<span class="chip nee">te posten</span>
+    {% elif w.promotie %}<span class="chip">{{ w.promotie }}</span>
+    {% else %}<span class="muted">?</span>{% endif %}</td>
+  <td class="klein">{{ w.n_img }} foto · {{ w.n_vid }} video{% if w.n_lokaal < (w.n_img + w.n_vid) %}<br><span class="muted">{{ w.n_lokaal }} lokaal, rest ☁</span>{% endif %}</td>
+  <td>
+    <span class="chip {{ 'ok' if w.status.kort else 'nee' }}">Kort</span>
+    <span class="chip {{ 'ok' if w.status.lang else 'nee' }}">Lang</span>
+    <span class="chip {{ 'ok' if w.status.caption else 'nee' }}">Caption</span>
+    {% if w.status.per_bestand %}<span class="chip">{{ w.status.per_bestand }} per bestand</span>{% endif %}
+  </td>
+  <td>{% if n_posts %}<span class="chip ok">{{ n_posts }}</span>{% else %}<span class="muted">–</span>{% endif %}</td>
+</tr>
+{% endfor %}
+</table>
+{% endblock %}

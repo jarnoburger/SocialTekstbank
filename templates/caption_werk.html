@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block titel %}Caption · {{ w.mapnaam }}{% endblock %}
+{% block inhoud %}
+<style>
+.cw-nav{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px}.cw-nav .ruimte{flex:1}
+.cw-grid{display:grid;grid-template-columns:minmax(300px,.8fr) 2fr;gap:14px;align-items:start}
+.cw-kol{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:12px 14px}
+.cw-kol h2{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+.cw-beelden{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px;margin-bottom:10px}
+.cw-beelden img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;background:var(--chip);cursor:zoom-in}
+.cw-beelden img.groot{position:fixed;inset:4vh 4vw;width:92vw;height:92vh;object-fit:contain;z-index:20;background:rgba(0,0,0,.85);cursor:zoom-out}
+.cw-ctx{font-size:13px;white-space:pre-wrap;margin:0 0 8px}
+.cw-post{font-size:12px;border-top:1px solid var(--line);padding-top:6px;margin-top:6px}
+.cw-post .tekst{white-space:pre-wrap;color:var(--muted);margin-top:2px}
+.cw-talen{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.cw-taal{display:flex;justify-content:space-between;align-items:center;margin:4px 0}
+.cw-taal b{font-size:13px}
+.cw-talen textarea{min-height:260px;font-size:14px;width:100%}
+#veld_Hashtags{width:100%;font-size:14px;min-height:44px}
+.cw-teller{font-size:12px;color:var(--muted)}.cw-teller.te-lang{color:var(--bad);font-weight:600}
+.cw-tags button{font-size:12px;padding:2px 9px;border-radius:20px;margin:2px 3px 2px 0}
+.cw-tags button.laag{border-color:var(--warn);color:var(--warn)}
+.cw-tags button.eigen{border-color:var(--accent);color:var(--accent)}
+.cw-twijfel{border-left:4px solid var(--warn);background:var(--chip);padding:6px 10px;border-radius:7px;font-size:12px;margin:6px 0}
+.cw-acties{position:sticky;bottom:0;background:var(--bg);padding:10px 0;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.cw-acties input[type=text]{flex:1;min-width:260px}
+button.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+button.klein{font-size:12px;padding:2px 8px}
+@media (max-width:1100px){.cw-grid,.cw-talen{grid-template-columns:1fr}}
+</style>
+
+<div class="cw-nav klein">
+  <a href="{{ url_for('captions_werken', **nav) }}">← lijst</a>
+  {% if positie[0] > 0 %}<span class="muted">{{ positie[0] }} / {{ positie[1] }} in “{{ nav.filter }}”</span>{% endif %}
+  <span class="ruimte"></span>
+  {% if vorige %}<a class="knop" id="vorige" href="{{ url_for('caption_werk', pid=vorige, **nav) }}">← vorige</a>{% endif %}
+  {% if volgende %}<a class="knop" id="volgende" href="{{ url_for('caption_werk', pid=volgende, **nav) }}">volgende →</a>{% endif %}
+  <a class="knop" href="{{ url_for('werk', pid=w.pid) }}">werk bewerken</a>
+</div>
+
+<h1>{{ w.mapnaam }} <span class="muted klein">{{ w.merk }}{% if w.jaar %} · {{ w.jaar }}{% endif %}{% if gekoppeld %} · {{ gekoppeld|length }} post(s){% endif %}</span>
+  {% if status == 'klaar' %}<span class="chip ok">✓ klaar</span>{% elif status == 'later' %}<span class="chip">later</span>{% elif status == 'overslaan' %}<span class="chip nee">niet posten</span>{% else %}<span class="chip warn">te beoordelen</span>{% endif %}
+  {% if claude %}<span class="chip" title="Caption NL is door Claude geschreven (04-10-2026)">Claude</span>{% endif %}
+</h1>
+
+<form method="post" id="cwform">
+<div class="cw-grid">
+
+  <!-- links: context -->
+  <div class="cw-kol">
+    <h2>Beelden en context</h2>
+    {% if beelden %}<div class="cw-beelden">{% for b in beelden[:9] %}<img src="{{ b }}" alt="" loading="lazy" onclick="this.classList.toggle('groot')">{% endfor %}</div>{% endif %}
+    {% for veld in ['Jaar en plek','Credits'] %}{% if t.velden.get(veld) %}<div class="cw-ctx"><b>{{ veld }}:</b> {{ t.velden[veld]|linkify }}</div>{% endif %}{% endfor %}
+    {% if alinea %}<details class="klein"><summary><b>Beeldbeschrijving</b></summary><div class="cw-ctx" style="margin-top:4px">{{ alinea }}</div></details>{% endif %}
+    {% if twijfel %}<div class="cw-twijfel"><b>Twijfel:</b> {{ twijfel }}</div>{% endif %}
+    {% if gekoppeld %}
+    <details class="klein" style="margin-top:6px"><summary><b>Gekoppelde posts + oude captions ({{ gekoppeld|length }})</b></summary>
+      {% for p in gekoppeld %}<div class="cw-post"><span class="chip">{{ p.platform|upper }}</span> {{ p.account }} · {{ p.timestamp|datum }} · <a href="{{ p.permalink }}" target="_blank" rel="noopener">open</a>
+        <div class="tekst">{{ p.caption.strip() or '— geen caption' }}</div></div>{% endfor %}
+    </details>
+    {% endif %}
+    {% if crosslinks %}
+    <details class="klein" style="margin-top:6px"><summary><b>Crosslinks ({{ crosslinks|length }})</b></summary>
+      {% for c in crosslinks %}<div style="margin-top:4px">{{ c.regel|linkify }}</div>{% endfor %}
+    </details>
+    {% endif %}
+  </div>
+
+  <!-- rechts: bewerken -->
+  <div class="cw-kol">
+    <h2>Caption <span class="muted">(wordt opgeslagen in _tekst.md)</span></h2>
+    <div class="cw-tags klein" style="margin-bottom:6px">
+      <span class="muted">Klik = invoegen bij de cursor:</span>
+      <button type="button" class="eigen" data-tag="{{ eigen }}">{{ eigen }}</button><button type="button" data-tag="{{ andere }}" title="ander merk">{{ andere }}</button>
+      {% for x in tags %}<button type="button" class="{{ 'laag' if 'laag' in x.zek or 'middel' in x.zek }}" data-tag="{{ x.h }}" title="{{ x.wie }}{% if x.zek %} · zekerheid {{ x.zek }}{% endif %}">{{ x.h }}</button>{% endfor %}
+      <button type="button" data-tag="Voor Urban-FX." title="credit-zin NL">Voor Urban-FX.</button><button type="button" data-tag="For Urban-FX." title="credit-zin EN">For Urban-FX.</button>
+    </div>
+    <div class="cw-talen">
+      <div>
+        <div class="cw-taal"><b>NL</b><span class="cw-teller" data-voor="veld_Caption_NL"></span></div>
+        <textarea name="veld_Caption_NL" id="veld_Caption_NL">{{ t.velden.get('Caption NL','') }}</textarea>
+      </div>
+      <div>
+        <div class="cw-taal"><b>EN</b><span class="cw-teller" data-voor="veld_Caption_EN"></span></div>
+        <textarea name="veld_Caption_EN" id="veld_Caption_EN">{{ t.velden.get('Caption EN','') }}</textarea>
+      </div>
+    </div>
+    <div class="cw-taal"><b>Hashtags</b><span class="muted klein">komen onder de caption; tellen mee in de teller</span></div>
+    <textarea name="veld_Hashtags" id="veld_Hashtags" rows="2">{{ t.velden.get('Hashtags','') }}</textarea>
+  </div>
+</div>
+
+<div class="cw-acties">
+  <input type="text" name="notitie" value="{{ notitie }}" placeholder="Notitie voor Claude (volgende ronde): bijv. korter, ander jaar, tag ook X">
+  <button class="ok" name="actie" value="klaar" title="Opslaan + klaar + volgende (k of Ctrl+Enter)">✓ Klaar</button>
+  <button class="primair" name="actie" value="opslaan" title="Ctrl+S">Opslaan</button>
+  <button name="actie" value="later">Later</button>
+  <button name="actie" value="overslaan" title="Dit werk wordt niet gepost: geen caption nodig, valt uit de reviewlijsten">Niet posten</button>
+  {% if status %}<button name="actie" value="reset" class="klein">status wissen</button>{% endif %}
+</div>
+</form>
+<p class="muted klein">Sneltoetsen: <b>Ctrl+S</b> opslaan · <b>Ctrl+Enter</b> klaar · buiten een tekstveld: <b>←</b>/<b>→</b> vorige/volgende, <b>k</b> = klaar. Klik op een beeld om te vergroten. Oranje tag = zekerheid laag/middel. Teller = caption + hashtags (IG max 2200 tekens, 30 #, 20 @).</p>
+
+<script>
+let laatste = document.getElementById('veld_Caption_NL');
+const velden = ['veld_Caption_NL', 'veld_Caption_EN', 'veld_Hashtags'].map(id => document.getElementById(id));
+velden.forEach(t => t.addEventListener('focus', () => { laatste = t; }));
+let gewijzigd = false;
+velden.forEach(t => t.addEventListener('input', () => { gewijzigd = true; telAlles(); }));
+document.querySelectorAll('.cw-tags button').forEach(b => b.addEventListener('click', () => {
+  const t = laatste, tag = b.dataset.tag, s = t.selectionStart ?? t.value.length, e = t.selectionEnd ?? s;
+  const voor = t.value.slice(0, s), na = t.value.slice(e);
+  const spatie = voor && !/\s$/.test(voor) ? ' ' : '';
+  t.value = voor + spatie + tag + (na && !/^\s/.test(na) ? ' ' : '') + na;
+  const pos = (voor + spatie + tag).length; t.focus(); t.setSelectionRange(pos, pos); gewijzigd = true; telAlles();
+}));
+function telAlles() {
+  const hs = document.getElementById('veld_Hashtags').value.trim();
+  ['veld_Caption_NL', 'veld_Caption_EN'].forEach(id => {
+    const tekst = document.getElementById(id).value.trim() + (hs ? '\n\n' + hs : '');
+    const el = document.querySelector(`.cw-teller[data-voor="${id}"]`);
+    const n = tekst.length, h = (tekst.match(/#\w+/g) || []).length, a = (tekst.match(/(^|\s)@[\w.]+/g) || []).length;
+    el.textContent = `${n} tekens · ${h} # · ${a} @`;
+    el.classList.toggle('te-lang', n > 2200 || h > 30 || a > 20);
+  });
+}
+telAlles();
+const form = document.getElementById('cwform');
+function verstuur(actie) { const i = document.createElement('input'); i.type = 'hidden'; i.name = 'actie'; i.value = actie; form.appendChild(i); gewijzigd = false; form.submit(); }
+form.addEventListener('submit', () => { gewijzigd = false; });
+window.addEventListener('beforeunload', e => { if (gewijzigd) { e.preventDefault(); e.returnValue = ''; } });
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); verstuur('opslaan'); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); verstuur('klaar'); return; }
+  const tg = e.target.tagName;
+  if (tg === 'TEXTAREA' || tg === 'INPUT' || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === 'ArrowLeft' && document.getElementById('vorige')) location = document.getElementById('vorige').href;
+  if (e.key === 'ArrowRight' && document.getElementById('volgende')) location = document.getElementById('volgende').href;
+  if (e.key === 'k') verstuur('klaar');
+  if (e.key === 'Escape') document.querySelectorAll('img.groot').forEach(i => i.classList.remove('groot'));
+});
+</script>
+{% endblock %}

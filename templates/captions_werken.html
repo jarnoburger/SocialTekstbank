@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block titel %}Captions per werk{% endblock %}
+{% block inhoud %}
+<style>
+.cw-thumb{width:64px;height:64px;object-fit:cover;border-radius:6px;background:var(--chip);display:block}
+.cw-tekst{white-space:pre-wrap;font-size:13px;max-height:84px;overflow:hidden}
+td.smal{width:1%;white-space:nowrap}
+</style>
+<h1>Captions per werk <span class="muted klein">Caption NL + EN + Hashtags uit _tekst.md · <a href="{{ url_for('captions_lijst') }}">oud: per post</a></span></h1>
+
+<div class="filters">
+  {% for f, label in [('open','Te beoordelen'),('claude','Door Claude geschreven'),('notitie','Met notitie voor Claude'),('later','Later'),('klaar','Klaar'),('geen_en','Zonder EN'),('geen_nl','Zonder caption'),('overslaan','Niet posten'),('alle','Alle')] %}
+  <a href="{{ url_for('captions_werken', filter=f, merk=merk) }}" class="{{ 'actief' if filt==f }}">{{ label }} ({{ tel[f] }})</a>
+  {% endfor %}
+</div>
+<div class="filters klein">
+  <span class="muted">Merk:</span>
+  <a href="{{ url_for('captions_werken', filter=filt) }}" class="{{ 'actief' if not merk }}">alle</a>
+  {% for m in merken %}<a href="{{ url_for('captions_werken', filter=filt, merk=m) }}" class="{{ 'actief' if merk==m }}">{{ m }}</a>{% endfor %}
+</div>
+
+{% if not rijen %}
+<p class="muted">Niets in deze lijst.</p>
+{% else %}
+<table>
+<tr><th></th><th>Werk</th><th>Caption NL</th><th>Caption EN</th><th>Status</th></tr>
+{% for r in rijen %}
+{% set u = url_for('caption_werk', pid=r.w.pid, filter=filt, merk=merk) %}
+<tr>
+  <td class="smal"><a href="{{ u }}">{% if r.beeld %}<img class="cw-thumb" loading="lazy" src="{{ url_for('beeld', batch=r.beeld.src.split('/')[0], map_=r.beeld.src.split('/')[1], bestand=r.beeld.bestand) }}" alt="">{% else %}<span class="cw-thumb"></span>{% endif %}</a></td>
+  <td class="smal"><a href="{{ u }}"><b>{{ r.w.mapnaam }}</b></a><br><span class="muted klein">{{ r.w.merk }}{% if r.w.jaar %} · {{ r.w.jaar }}{% endif %}</span></td>
+  <td><div class="cw-tekst">{{ r.nl|kort(220) or '—' }}</div></td>
+  <td><div class="cw-tekst muted">{{ r.en|kort(160) or '—' }}</div></td>
+  <td class="smal">
+    {% if r.status == 'klaar' %}<span class="chip ok">✓ klaar</span>{% elif r.status == 'later' %}<span class="chip">later</span>{% elif r.status == 'overslaan' %}<span class="chip nee">niet posten</span>{% elif r.nl %}<span class="chip warn">te beoordelen</span>{% else %}<span class="chip">leeg</span>{% endif %}
+    {% if r.claude %}<br><span class="chip" title="Caption NL geschreven door Claude">Claude</span>{% endif %}
+    {% if r.notitie %}<br><span class="chip nee" title="{{ r.notitie }}">notitie</span>{% endif %}
+  </td>
+</tr>
+{% endfor %}
+</table>
+{% endif %}
+{% endblock %}

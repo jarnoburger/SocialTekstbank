@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block inhoud %}
+<h1>Overzicht</h1>
+{% if not accounts %}
+<div class="flash fout">Nog geen Meta-koppeling: de lokale kant werkt al, de online check nog niet. <a href="{{ url_for('instellingen') }}">Naar installatie →</a></div>
+{% endif %}
+<div class="kaarten">
+{% for merk, m in per_merk.items() %}
+  <div class="kaart">
+    <h2 style="margin-top:0">{{ merk }}</h2>
+    <div class="muted klein">Lokaal: {{ m.werken }} werken · {{ m.media }} media</div>
+    <div class="kpi">
+      <div><b style="color:var(--ok)">{{ m.volledig }}</b>tekst compleet</div>
+      <div><b style="color:var(--warn)">{{ m.met_tekst }}</b>deels</div>
+      <div><b style="color:var(--bad)">{{ m.zonder }}</b>geen tekst</div>
+    </div>
+    <div class="muted klein" style="margin-top:12px">Online: {{ m.posts }} posts</div>
+    <div class="kpi">
+      <div><b style="color:var(--bad)">{{ m.zonder_caption }}</b>zonder caption</div>
+      <div><b style="color:var(--warn)">{{ m.ongekoppeld }}</b>niet gekoppeld</div>
+      <div><b>{{ m.posts - m.ongekoppeld }}</b>gekoppeld</div>
+    </div>
+    <div class="muted klein" style="margin-top:8px">{{ m.groepen or 0 }} te koppelen regels (IG+FB-crossposts samen), waarvan <b>{{ m.groepen_open or 0 }}</b> nog open</div>
+    <p style="margin-bottom:0">
+      <a href="{{ url_for('lokaal', merk=merk, filter='leeg') }}">Werken zonder tekst →</a> ·
+      <a href="{{ url_for('online_pagina', filter='geen_caption') }}">Posts zonder caption →</a>
+    </p>
+  </div>
+{% endfor %}
+</div>
+
+<h2>Werkwijze</h2>
+<ol class="stappen">
+  <li><b>Oogsten:</b> <i>Posts ophalen</i>, dan bij <i>Online</i> elke post (IG+FB-crosspost als één regel) koppelen aan het juiste werk. De caption gaat automatisch naar <code>_tekst.md</code> in die map.</li>
+  <li><b>Gaten vullen:</b> bij <i>Lokaal</i> → filter <i>geen tekst</i>, per werk Kort, Lang en Caption invullen.</li>
+  <li><b>Online repareren:</b> posts zonder caption: open de post en plak de caption uit de tekstbank.</li>
+  <li><b>Hergebruiken:</b> <i>Export tekstbank</i> geeft één bestand voor portfolio, bio en aanvragen.</li>
+</ol>
+<p class="muted klein">Online data: {{ on.opgehaald or 'nog niet opgehaald' }} · {{ n_links }} koppelingen</p>
+{% endblock %}

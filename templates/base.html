@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block titel %}SocialTekstbank{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header>
+  <span class="logo">SocialTekstbank</span>
+  <nav>
+    <a href="{{ url_for('overzicht') }}" class="{{ 'actief' if request.endpoint=='overzicht' }}">Overzicht</a>
+    <span class="nav-fase">Nieuwe posts:</span>
+    <a href="{{ url_for('nieuw_lijst') }}" class="{{ 'actief' if request.endpoint in ('nieuw_lijst','nieuw_werk') }}">0 · Nieuw materiaal</a>
+    <a href="{{ url_for('plannen') }}" class="{{ 'actief' if request.endpoint in ('plannen','plan_werk') }}">1 · Nieuwe post</a>
+    <a href="{{ url_for('planning') }}" class="{{ 'actief' if request.endpoint=='planning' }}">2 · Planning</a>
+    <a href="{{ url_for('posten') }}" class="{{ 'actief' if request.endpoint in ('posten','post_werk') }}">3 · Publiceer</a>
+    <a href="{{ url_for('online_pagina') }}" class="{{ 'actief' if request.endpoint=='online_pagina' }}">Online (posts)</a>
+    <a href="{{ url_for('instellingen') }}" class="{{ 'actief' if request.endpoint in ('instellingen','instellingen_check') }}">Instellingen</a>
+    {% set oud = request.endpoint in ('lokaal','werk','review_lijst','review','verplaats_lijst','dubbel','captions_werken','caption_werk','captions_lijst','caption','publiceer','publiceer_werk','publiceer_leeg','los_lijst','los_item','los_namen') %}
+    <details class="nav-oud" {{ 'open' if oud }}><summary class="{{ 'actief' if oud }}">Oude posts ▾</summary>
+      <a href="{{ url_for('lokaal') }}" class="{{ 'actief' if request.endpoint in ('lokaal','werk') }}">Lokaal (werken)</a>
+      <a href="{{ url_for('review_lijst') }}" class="{{ 'actief' if request.endpoint in ('review_lijst','review','verplaats_lijst') }}">Review</a>
+      <a href="{{ url_for('dubbel') }}" class="{{ 'actief' if request.endpoint=='dubbel' }}">Dubbel?</a>
+      <a href="{{ url_for('captions_werken') }}" class="{{ 'actief' if request.endpoint in ('captions_werken','caption_werk','captions_lijst','caption') }}">Captions</a>
+      <a href="{{ url_for('publiceer') }}" class="{{ 'actief' if request.endpoint in ('publiceer','publiceer_werk','publiceer_leeg') }}">Bijwerken</a>
+      <a href="{{ url_for('los_lijst') }}" class="{{ 'actief' if request.endpoint in ('los_lijst','los_item','los_namen') }}">_Los uitzoeken</a>
+    </details>
+  </nav>
+  <style>
+    .nav-fase{color:var(--muted);font-size:13px;margin-right:6px}
+    .nav-oud{display:inline-block;margin-left:6px;font-size:14px}
+    .nav-oud summary{cursor:pointer;color:var(--muted);display:inline}
+    .nav-oud summary.actief{color:var(--accent)}
+    .nav-oud[open] a{margin-left:10px;margin-right:4px}
+  </style>
+  <div class="acties">
+    <form class="inline" method="post" action="{{ url_for('actie_herscan') }}"><button title="Mappen opnieuw inlezen">↻ Herscan{% if nu_gescand %} <span class="muted klein">({{ nu_gescand }})</span>{% endif %}</button></form>
+    <form class="inline" method="post" action="{{ url_for('actie_ophalen') }}"><button title="Posts ophalen van IG en FB">⇣ Posts ophalen</button></form>
+    <a class="knop" href="{{ url_for('export') }}" title="Alle teksten als één Markdown-bestand">⇩ Export tekstbank</a>
+  </div>
+</header>
+<main>
+{% with berichten = get_flashed_messages(with_categories=true) %}
+  {% for cat, b in berichten %}<div class="flash {{ cat }}">{{ b }}</div>{% endfor %}
+{% endwith %}
+{% block inhoud %}{% endblock %}
+</main>
+</body>
+</html>

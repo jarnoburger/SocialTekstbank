@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block titel %}_Los · namen en groepen{% endblock %}
+{% block inhoud %}
+<style>
+.ln-raster{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.ln-kaart{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px}
+.ln-kaart.later{opacity:.75}.ln-kaart.dubbel,.ln-kaart.weg{opacity:.45}
+.ln-media{width:100%;height:160px;object-fit:cover;border-radius:6px;background:var(--chip);cursor:zoom-in}
+.ln-naam{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin:6px 0 4px}
+.ln-rij{display:flex;gap:6px;align-items:center}
+.ln-rij select{flex:1;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:4px}
+.ln-mini{font-size:12px;padding:3px 7px;border-radius:6px;border:1px solid var(--line);background:var(--chip);color:var(--ink);cursor:pointer}
+.ln-dicht{display:flex;gap:6px;align-items:center;margin-top:6px;font-size:12px}
+.ln-dicht img{width:64px;height:48px;object-fit:cover;border-radius:4px;background:var(--chip)}
+.ln-balk{position:sticky;bottom:0;background:var(--panel);border-top:1px solid var(--line);padding:10px 0;margin-top:14px;display:flex;gap:12px;align-items:center}
+.ln-groot{font-size:16px;padding:9px 20px;border-radius:8px;border:0;background:var(--ok);color:#fff;cursor:pointer}
+.ln-zoom{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:50}
+.ln-zoom img,.ln-zoom video{max-width:94vw;max-height:94vh}
+</style>
+
+<h1 style="margin:0 0 4px">_Los · namen en groepen</h1>
+<p class="muted" style="margin:0 0 12px">{{ items|length }} bestanden. <b>Zelfde naam = zelfde werk.</b>
+  Typ je de naam van een <b>bestaand werk</b> (lijst verschijnt tijdens typen), dan gaat het bestand daarheen.
+  Leeg laten = niets veranderen. Gesorteerd op merk en datum in de bestandsnaam, zodat één dag bij elkaar staat.
+  <a href="{{ url_for('los_lijst', filter='alle') }}">← per stuk</a></p>
+
+<form method="post">
+<datalist id="namen">
+  {% for n in namen_in_gebruik %}<option value="{{ n }}">{% endfor %}
+  {% for w in werken %}<option value="{{ w.mapnaam }}">{% endfor %}
+</datalist>
+<div class="ln-raster">
+{% for x in items %}{% set r = x.r %}
+  <div class="ln-kaart {{ x.actie }}" id="k{{ loop.index }}">
+    <input type="hidden" name="key" value="{{ x.key }}"><input type="hidden" name="idx_{{ x.key }}" value="{{ loop.index }}">
+    {% if r.type == 'img' %}<img class="ln-media" src="{{ x.url }}" loading="lazy" onclick="zoom('{{ x.url }}','img')">
+    {% else %}<video class="ln-media" src="{{ x.url }}#t=1" preload="metadata" muted onclick="zoom('{{ x.url }}','vid')"></video>{% endif %}
+    <div class="muted klein" title="{{ r.naam }}">{{ r.merk }} · {{ x.datum or 'geen datum' }} · {{ r.naam[:30] }}</div>
+    <input class="ln-naam" name="naam_{{ loop.index }}" list="namen" value="{{ x.naam }}" placeholder="{{ x.placeholder }}" oninput="naamGetypt(this)">
+    <div class="ln-rij">
+      <select name="actie_{{ loop.index }}" onchange="this.closest('.ln-kaart').className='ln-kaart '+this.value">
+        {% for a, l in (('nieuw','werk (naam hierboven)'),('later','later'),('dubbel','dubbel'),('weg','niet nodig')) %}
+        <option value="{{ a }}" {{ 'selected' if x.actie == a }}>{{ l }}</option>{% endfor %}
+      </select>
+      {% if not loop.first %}<button type="button" class="ln-mini" onclick="vorige({{ loop.index }})" title="naam van het vorige bestand overnemen">= vorige</button>{% endif %}
+    </div>
+    {% set d = r.dichtst %}
+    {% if d and d.afstand <= 18 %}
+    <div class="ln-dicht">
+      {% if d.soort == 'werk' and not d.cloud %}<img src="{{ url_for('origineel', pid=d.pid, rel=d.rel) }}" loading="lazy">
+      {% elif d.soort == 'online' and d.thumb %}<img src="{{ d.thumb }}" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">{% endif %}
+      <span>lijkt wat op <b>{{ d.werk or '?' }}</b><br><span class="muted">{{ d.soort }} · verschil {{ d.afstand }}/64{% if d.permalink %} · <a href="{{ d.permalink }}" target="_blank" rel="noopener">post</a>{% endif %}</span></span>
+    </div>
+    {% endif %}
+  </div>
+{% endfor %}
+</div>
+<div class="ln-balk"><button class="ln-groot">💾 Alles opslaan</button>
+  <span class="muted klein">Na opslaan zeg je het mij; ik laat eerst zien wat er gebeurt en voer pas uit na jouw akkoord.</span></div>
+</form>
+<div class="ln-zoom" id="zoom" onclick="this.style.display='none';this.innerHTML=''"></div>
+
+<script>
+function naamGetypt(inp) {
+  // naam typen = dit bestand hoort bij een werk -> keuzelijst op 'werk' zetten
+  const s = inp.closest('.ln-kaart').querySelector('select');
+  if (inp.value.trim() && s.value === 'later') { s.value = 'nieuw'; s.closest('.ln-kaart').className = 'ln-kaart nieuw'; }
+}
+function vorige(i) {
+  const v = document.querySelector(`[name="naam_${i - 1}"]`), n = document.querySelector(`[name="naam_${i}"]`);
+  if (v && n) { n.value = v.value; naamGetypt(n); }
+}
+function zoom(src, t) {
+  const z = document.getElementById('zoom');
+  z.innerHTML = t === 'img' ? `<img src="${src}">` : `<video src="${src}" controls autoplay></video>`;
+  z.style.display = 'flex';
+}
+</script>
+{% endblock %}

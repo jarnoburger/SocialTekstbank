@@ -1,0 +1,19 @@
+﻿# SocialTekstbank - bestanden die NOOIT in git mogen
+
+# Data: persoonlijke data + Meta-tokens (data\config.json)
+data/
+
+# Back-ups van losse bestanden
+*.bak
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Editor / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

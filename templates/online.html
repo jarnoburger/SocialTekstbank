@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block inhoud %}
+<h1>Online: posts op IG en FB</h1>
+{% if not on.posts %}
+<div class="flash">Nog geen posts opgehaald. Koppel eerst Meta bij <a href="{{ url_for('instellingen') }}">Instellingen</a> en klik daarna bovenaan op <b>Posts ophalen</b>.</div>
+{% else %}
+<div class="filters">
+  <a href="{{ url_for('online_pagina', filter=filt) }}" class="{{ 'actief' if not account }}">Alle accounts</a>
+  {% for a in accounts %}<a href="{{ url_for('online_pagina', account=a, filter=filt) }}" class="{{ 'actief' if account==a }}">{{ a }}</a>{% endfor %}
+  <span class="muted">|</span>
+  <a href="{{ url_for('online_pagina', account=account) }}" class="{{ 'actief' if not filt }}">Alles</a>
+  <a href="{{ url_for('online_pagina', account=account, filter='ongekoppeld') }}" class="{{ 'actief' if filt=='ongekoppeld' }}">Nog te koppelen</a>
+  <a href="{{ url_for('online_pagina', account=account, filter='geen_caption') }}" class="{{ 'actief' if filt=='geen_caption' }}">Met post zonder caption</a>
+  <a href="{{ url_for('online_pagina', account=account, filter='opruimen') }}" class="{{ 'actief' if filt=='opruimen' }}">Opruimen ({{ n_weg }})</a>
+  <span class="muted klein">{{ rijen|length }} regels · {{ n_posts }} posts · opgehaald {{ on.opgehaald }}</span>
+  <form class="inline" method="post" action="{{ url_for('actie_match') }}" style="margin-left:auto">
+    <button title="Vergelijkt ook beelden: online thumbnails met je lokale foto's (duurt 1-2 min)">Voorstellen verbeteren (beelden)</button></form>
+</div>
+{% for f in on.fouten %}<div class="flash fout">{{ f }}</div>{% endfor %}
+
+{% for g, gekoppeld, kand, open_keys, per_post in rijen %}
+<div class="post">
+  <div class="thumbs">{% for t in g.thumbs[:4] %}<img loading="lazy" src="{{ t }}" alt="" referrerpolicy="no-referrer">{% endfor %}</div>
+  <div>
+    <div class="klein">
+      <span class="chip">{{ g.soort }}</span>
+      <b>{{ g.accounts|join(' + ') }}</b> · {{ g.start|datum }} {{ g.start[11:16] }}{% for p in g.posts %} · <a href="{{ p.permalink }}" target="_blank">open {{ p.platform|upper }} ↗</a>{% endfor %}
+      {% if g.n_zonder %} · <span class="chip nee">{{ g.n_zonder }} zonder caption</span>{% endif %}
+    </div>
+    {% for c in g.captions[:3] %}<div class="caption" style="margin-top:6px">{{ c }}</div>{% endfor %}
+    {% if g.captions|length > 3 %}<div class="muted klein">+ {{ g.captions|length - 3 }} andere captions</div>{% endif %}
+    {% if not g.captions %}<div class="muted klein" style="margin-top:6px">Geen caption.</div>{% endif %}
+    {% if g.n_zonder and gekoppeld and gekoppeld[0].tekst and gekoppeld[0].tekst.velden.get('Caption NL') %}
+      <div class="klein muted" style="margin-top:6px">Klaar om te plakken uit de tekstbank van {{ gekoppeld[0].naam }}:</div>
+      <textarea readonly onclick="this.select()">{{ gekoppeld[0].tekst.velden['Caption NL'] }}</textarea>
+    {% endif %}
+    {% if g['keys']|length > 1 %}
+    <details style="margin-top:8px"><summary class="klein">IG en FB los koppelen</summary>
+      {% for p in g.posts %}
+      <div class="voorstel klein">
+        <div style="display:flex;gap:8px">{% if p.thumbs %}<img loading="lazy" src="{{ p.thumbs[0] }}" referrerpolicy="no-referrer" style="width:54px;height:54px;object-fit:cover;border-radius:4px;flex:none">{% endif %}<div><span class="chip">{{ p.platform|upper }}</span> {{ p.timestamp[:16]|replace('T',' ') }} · <a href="{{ p.permalink }}" target="_blank">open ↗</a>
+          · {{ p.caption|kort(80) or '⚠ geen caption' }}
+          {% if per_post[p.key] %}<br><span class="chip ok">→ {{ per_post[p.key].naam }}</span>{% endif %}</div></div>
+        <form method="post" action="{{ url_for('koppel') }}" style="display:flex;gap:4px;min-width:200px">
+          <input type="hidden" name="post_key" value="{{ p.key }}">
+          <select name="pid" class="werksel"><option value="">— los koppelen —</option></select><button>OK</button></form>
+      </div>
+      {% endfor %}
+    </details>
+    {% endif %}
+  </div>
+  <div>
+    {% if filt == 'opruimen' %}
+      <div><span class="chip warn">op opruimlijst</span></div>
+      <div class="klein muted" style="margin:6px 0">Verwijder online via de <i>open</i>-link hierboven (… → Verwijderen).</div>
+      <form class="inline" method="post" action="{{ url_for('opruimen_actie') }}">{% for k in g['keys'] %}<input type="hidden" name="post_key" value="{{ k }}">{% endfor %}<input type="hidden" name="terug" value="1"><button class="klein">Terugzetten</button></form>
+    {% else %}
+    {% if gekoppeld %}
+      {% for w in gekoppeld %}<div><span class="chip ok">gekoppeld</span> <a href="{{ url_for('werk', pid=w.pid) }}">{{ w.naam }}</a></div>{% endfor %}
+      {% if open_keys %}<div class="muted klein">{{ open_keys|length }} post(s) nog niet gekoppeld</div>{% endif %}
+      <form class="inline" method="post" action="{{ url_for('koppel') }}">{% for k in g['keys'] %}<input type="hidden" name="post_key" value="{{ k }}">{% endfor %}<input type="hidden" name="ontkoppel" value="1"><button class="klein" style="margin-top:6px">Ontkoppel</button></form>
+    {% endif %}
+    {% if open_keys %}
+      {% for score, w, redenen in kand %}
+      <div class="voorstel">
+        <div><a href="{{ url_for('werk', pid=w.pid) }}">{{ w.naam }}</a> <span class="muted klein">({{ score }})</span><div class="muted klein">{{ redenen|join(' · ') }}</div></div>
+        <form class="inline" method="post" action="{{ url_for('koppel') }}">{% for k in open_keys %}<input type="hidden" name="post_key" value="{{ k }}">{% endfor %}<input type="hidden" name="pid" value="{{ w.pid }}"><button>Koppel{% if open_keys|length > 1 %} ({{ open_keys|length }}){% endif %}</button></form>
+      </div>
+      {% else %}{% if not gekoppeld %}<div class="muted klein">Geen voorstel. Kies zelf:</div>{% endif %}{% endfor %}
+      <form method="post" action="{{ url_for('koppel') }}" style="margin-top:8px;display:flex;gap:6px">
+        {% for k in open_keys %}<input type="hidden" name="post_key" value="{{ k }}">{% endfor %}
+        <select name="pid" class="werksel"><option value="">— kies werk —</option></select><button>OK</button>
+      </form>
+      <form method="post" action="{{ url_for('opruimen_actie') }}" style="margin-top:6px">{% for k in open_keys %}<input type="hidden" name="post_key" value="{{ k }}">{% endfor %}<button class="klein" title="Hoort nergens bij; online verwijderen">🗑 Opruimen</button></form>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+<template id="werkopties">{% for w in alle_werken %}<option value="{{ w.pid }}">{{ w.merk }} · {{ w.naam }}</option>{% endfor %}</template>
+<script>
+// opties één keer in de pagina; pas invullen als je een keuzelijst aanklikt (scheelt MB's HTML)
+document.addEventListener('focusin', e => {
+  const s = e.target;
+  if (s.classList && s.classList.contains('werksel') && s.options.length < 2)
+    s.append(document.getElementById('werkopties').content.cloneNode(true));
+});
+document.addEventListener('mousedown', e => {
+  const s = e.target;
+  if (s.classList && s.classList.contains('werksel') && s.options.length < 2)
+    s.append(document.getElementById('werkopties').content.cloneNode(true));
+});
+</script>
+{% endif %}
+{% endblock %}

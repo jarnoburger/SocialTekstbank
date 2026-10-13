@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block inhoud %}
+<h1>Instellingen</h1>
+
+<div class="kaarten">
+<div class="kaart">
+<h2 style="margin-top:0">1. Meta koppelen (eenmalig, ±30 min)</h2>
+<ol class="stappen klein">
+  <li>Ga naar <b>developers.facebook.com</b> → <i>Mijn apps</i> → <i>App maken</i>. Kies het type/gebruik voor <b>Zakelijk</b> (Business) of <b>Overig</b> → Zakelijk. Koppel hem aan je Business-portfolio als daarom gevraagd wordt.<br><span class="muted">Meta verandert deze schermen regelmatig, dus de namen kunnen iets afwijken.</span></li>
+  <li><i>App-instellingen → Basis</i>: kopieer <b>App-ID</b> en <b>App-geheim</b>.</li>
+  <li>Open <i>Tools → Graph API Explorer</i>. Kies je app en <i>User Token</i>, en voeg deze rechten toe:<br>
+    <code>pages_show_list</code> <code>pages_read_engagement</code> <code>instagram_basic</code> <code>business_management</code></li>
+  <li><i>Generate Access Token</i>, log in en vink <b>beide pagina's en beide IG-accounts</b> aan. Kopieer het token.</li>
+  <li>Plak alles hieronder. De app wisselt het om naar tokens die niet verlopen.</li>
+</ol>
+<form method="post" action="{{ url_for('instellingen_token') }}">
+  <label>App-ID</label><input type="text" name="app_id" value="{{ c.app_id }}" required>
+  <label>App-geheim</label><input type="password" name="app_secret" value="{{ c.app_secret }}" required>
+  <label>Gebruikerstoken (uit Graph API Explorer)</label><textarea name="token" required style="min-height:60px"></textarea>
+  <p><button class="primair">Koppelen</button></p>
+</form>
+<p class="klein muted">Alles blijft lokaal in <code>data\config.json</code>. Deel die map niet.</p>
+</div>
+
+<div class="kaart">
+<h2 style="margin-top:0">2. Accounts</h2>
+<form method="post">
+{% if c.accounts %}
+<table>
+<tr><th>Actief</th><th>FB-pagina</th><th>Instagram</th><th>Merk</th></tr>
+{% for a in c.accounts %}
+<tr>
+  <td><input type="checkbox" name="actief_{{ loop.index0 }}" {{ 'checked' if a.actief }}></td>
+  <td>{{ a.fb_naam }}</td>
+  <td>{% if a.ig_username %}@{{ a.ig_username }}{% else %}<span class="chip nee">niet gekoppeld</span>{% endif %}</td>
+  <td><input type="text" name="merk_{{ loop.index0 }}" value="{{ a.merk }}" style="width:110px"></td>
+</tr>
+{% endfor %}
+</table>
+<p class="klein"><a href="{{ url_for('instellingen_check') }}">Tokens controleren</a></p>
+{% if tokens %}<table>{% for t in tokens %}<tr><td>{{ t.account }}</td><td><span class="chip {{ 'ok' if t.geldig else 'nee' }}">{{ 'geldig' if t.geldig else 'ongeldig' }}</span></td><td>verloopt: {{ t.verloopt }}</td></tr>{% endfor %}</table>{% endif %}
+{% else %}
+<p class="muted">Nog niets gekoppeld.</p>
+{% endif %}
+
+<h2>3. Lokale mappen</h2>
+<p class="klein muted">Het merk moet overeenkomen met het merk van de accounts hierboven.</p>
+{% for i in range(4) %}{% set r = c.roots[i] if i < c.roots|length else {} %}
+<div style="display:flex;gap:6px;margin-bottom:6px">
+  <input type="text" name="root_merk_{{ i }}" value="{{ r.merk }}" placeholder="merk" style="width:110px">
+  <input type="text" name="root_pad_{{ i }}" value="{{ r.pad }}" placeholder="C:\pad\naar\map">
+</div>
+{% endfor %}
+<label class="klein">Graph API-versie</label><input type="text" name="graph_version" value="{{ c.graph_version }}" style="width:120px">
+<p><button class="primair">Opslaan</button></p>
+</form>
+</div>
+</div>
+{% endblock %}

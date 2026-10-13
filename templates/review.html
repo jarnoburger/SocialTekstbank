@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block titel %}Review · {{ w.mapnaam }}{% endblock %}
+{% block inhoud %}
+<style>
+.rv-nav{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.rv-nav .ruimte{flex:1}
+.rv-twijfel{border-left:4px solid var(--warn);background:var(--chip);padding:9px 13px;border-radius:7px;margin:10px 0}
+.rv-kop{display:grid;grid-template-columns:240px 1fr 1fr;gap:14px;font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);padding:0 4px 6px}
+.rv-rij{display:grid;grid-template-columns:240px 1fr 1fr;gap:14px;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:10px;margin-bottom:8px;align-items:start}
+.rv-rij img{width:240px;height:240px;object-fit:cover;border-radius:8px;background:var(--chip);cursor:zoom-in}
+.rv-rij img.groot{position:fixed;inset:4vh 4vw;width:92vw;height:92vh;object-fit:contain;z-index:20;background:rgba(0,0,0,.85);cursor:zoom-out}
+.rv-claude{font-size:15px}
+.rv-huidig{white-space:pre-wrap;font-size:14px}
+.rv-bron{font-size:12px;color:var(--muted);margin-bottom:4px}
+.rv-teksten{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
+.rv-teksten textarea{min-height:230px;width:100%}
+.rv-acties{position:sticky;bottom:0;background:var(--bg);padding:10px 0;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.rv-acties input[type=text]{flex:1;min-width:220px}
+.rv-verpl{margin-top:6px;display:flex;flex-direction:column;gap:3px}
+.rv-verpl input{width:240px;font-size:13px}
+.rv-rij.verplaatst,.kaart.verplaatst{border-color:var(--warn);box-shadow:inset 4px 0 0 var(--warn)}
+.rv-lokaal{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.rv-lokaal .kaart img{width:100%;height:200px;object-fit:cover;border-radius:6px}
+button.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+button.fout{border-color:var(--bad);color:var(--bad)}
+@media (max-width:900px){.rv-kop{display:none}.rv-rij,.rv-teksten{grid-template-columns:1fr}.rv-rij img{width:100%;height:auto}}
+</style>
+
+<div class="rv-nav klein">
+  <a href="{{ url_for('review_lijst', merk=merk) }}">← lijst</a>
+  <span class="muted">{{ positie[0] }} / {{ positie[1] }}{% if merk %} · {{ merk }}{% endif %}</span>
+  <span class="ruimte"></span>
+  {% if vorige %}<a class="knop" id="vorige" href="{{ url_for('review', pid=vorige, merk=merk) }}">← vorige</a>{% endif %}
+  {% if volgende %}<a class="knop" id="volgende" href="{{ url_for('review', pid=volgende, merk=merk) }}">volgende →</a>{% endif %}
+  <a class="knop" href="{{ url_for('werk', pid=w.pid) }}">werk bewerken</a>
+</div>
+
+<h1>{{ w.mapnaam }} <span class="muted klein">{{ w.merk }} · {{ w.jaar or 'jaar ?' }} · {{ w.n_img }} foto's · {{ w.n_vid }} video's · {{ gekoppeld|length }} posts</span>
+  {% if status == 'ok' %}<span class="chip ok">✓ ok</span>{% elif status == 'aangepast' %}<span class="chip ok">✎ aangepast</span>{% elif status == 'fout' %}<span class="chip nee">✗ klopt niet</span>{% else %}<span class="chip warn">open</span>{% endif %}
+</h1>
+
+{% if alinea %}<p class="rv-claude"><b>Claude:</b> {{ alinea }}</p>{% endif %}
+{% if twijfel %}<div class="rv-twijfel"><b>Twijfel:</b> {{ twijfel }}</div>{% endif %}
+{% if w.yml.review_notitie %}<div class="rv-twijfel" style="border-left-color:var(--accent)"><b>Jouw notitie:</b> {{ w.yml.review_notitie }}</div>{% endif %}
+
+{% set cl = tekst.velden.get('Crosslinks','') %}
+{% if cl or tekst.velden.get('Jaar en plek') or tekst.velden.get('Credits') or tekst.velden.get('Pers') %}
+<div class="kaart klein" style="margin:10px 0;white-space:pre-wrap">{% if tekst.velden.get('Jaar en plek') %}<b>Jaar en plek:</b> {{ tekst.velden['Jaar en plek'] }}
+{% endif %}{% if tekst.velden.get('Credits') %}<b>Credits:</b> {{ tekst.velden['Credits']|linkify }}
+{% endif %}{% if cl %}<b>Crosslinks</b>
+{{ cl|linkify }}{% endif %}{% if tekst.velden.get('Pers') %}
+
+<b>Pers</b>
+{{ tekst.velden['Pers']|linkify }}{% endif %}</div>
+{% endif %}
+
+{% if beelden %}
+<div class="rv-kop"><div>Beeld</div><div>Wat Claude ziet</div><div>Huidige tekst (caption bij die post)</div></div>
+{% set gezien = [] %}
+{% for x in beelden %}
+<div class="rv-rij{{ ' verplaatst' if x.verpl }}">
+  <div>
+  <img src="{{ url_for('beeld', batch=x.b.src.split('/')[0], map_=x.b.src.split('/')[1], bestand=x.b.bestand) }}" alt="{{ x.alt }}" onclick="this.classList.toggle('groot')">
+  {% if x.eerste %}
+  <div class="rv-verpl klein">
+    <input class="verpl" form="rvform" list="werklijst" name="verpl::{{ x.iid }}" value="{{ (x.verpl.naar_map ~ (' · ' ~ x.verpl.merk if not x.verpl.nieuw else '')) if x.verpl else '' }}" placeholder="hoort bij ander werk…" title="Kies een bestaand werk of typ een nieuwe naam. Leeg = hoort hier.{% if x.b.post %} Geldt voor de hele post.{% endif %}">
+    {% if x.verpl %}<span class="chip warn">→ {{ x.verpl.naar_map }}{% if x.verpl.nieuw %} (nieuw werk){% endif %}</span>{% endif %}
+    {% if x.b.post %}<span class="muted">geldt voor de hele post</span>{% endif %}
+  </div>
+  {% else %}<div class="muted klein">zelfde post: zie markering hierboven</div>{% endif %}
+  </div>
+  <div class="rv-claude">{{ x.alt or '—' }}</div>
+  <div>
+    {% if x.post %}
+      <div class="rv-bron"><span class="chip">{{ x.post.platform|upper }}</span> {{ x.post.timestamp|datum }} · <a href="{{ x.post.permalink }}" target="_blank">open post</a></div>
+      {% if x.post.key in gezien %}<div class="muted klein">zelfde post als hierboven</div>
+      {% else %}<div class="rv-huidig">{{ x.post.caption or '⚠ geen caption' }}</div>{% endif %}
+      {% set _ = gezien.append(x.post.key) %}
+    {% elif x.b.post %}
+      <div class="rv-bron">{{ x.b.platform|upper }} {{ x.b.datum }} · <a href="{{ x.b.permalink }}" target="_blank">open post</a></div>
+      <div class="muted klein">post niet meer in de opgehaalde lijst</div>
+    {% else %}
+      <div class="rv-bron">lokaal bestand</div>
+      <div class="muted klein">{{ x.b.lokaal }}<br>nog niet online geplaatst, geen caption</div>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+{% elif lokaal %}
+<p class="muted klein">Geen opgehaalde beelden; lokale foto's (niet-cloud):</p>
+<div class="rv-lokaal">{% for x in lokaal %}<div class="kaart klein{{ ' verplaatst' if x.verpl }}">
+  <img loading="lazy" src="{{ url_for('thumb', pid=w.pid, idx=x.i) }}" alt="" onclick="this.classList.toggle('groot')">
+  <div class="muted">{{ x.naam }}</div>
+  <input class="verpl" form="rvform" list="werklijst" name="verpl::{{ x.iid }}" value="{{ (x.verpl.naar_map ~ (' · ' ~ x.verpl.merk if not x.verpl.nieuw else '')) if x.verpl else '' }}" placeholder="hoort bij ander werk…" style="width:100%">
+  {% if x.verpl %}<span class="chip warn">→ {{ x.verpl.naar_map }}{% if x.verpl.nieuw %} (nieuw){% endif %}</span>{% endif %}
+</div>{% endfor %}</div>
+{% else %}
+<p class="muted">Geen beelden beschikbaar (alleen video of alles staat in de cloud).</p>
+{% endif %}
+
+<datalist id="werklijst">{% for o in werk_opties %}<option value="{{ o }}">{% endfor %}</datalist>
+<form method="post" id="rvform">
+<div class="rv-teksten">
+  <div class="veld">
+    <label>Claude-tekst: Beeldbeschrijving</label><small>Pas aan waar het niet klopt. Regels "- bron: tekst" horen bij de beelden hierboven (op volgorde).</small>
+    <textarea name="veld_Beeldbeschrijving">{{ tekst.velden.get('Beeldbeschrijving','') }}</textarea>
+  </div>
+  <div class="veld">
+    <label>Huidige tekst: Caption NL</label><small>Staat nu in _tekst.md (overgenomen van de eerste online caption).</small>
+    <textarea name="veld_Caption NL">{{ tekst.velden.get('Caption NL','') }}</textarea>
+    {% if gekoppeld|length > 1 %}
+    <details class="klein" style="margin-top:6px"><summary>Alle {{ gekoppeld|length }} online captions</summary>
+      {% for p in gekoppeld %}<div class="kaart" style="margin-top:6px"><div class="muted">{{ p.platform|upper }} · {{ p.timestamp|datum }} · <a href="{{ p.permalink }}" target="_blank">open</a></div><div style="white-space:pre-wrap">{{ p.caption or '⚠ geen caption' }}</div></div>{% endfor %}
+    </details>
+    {% endif %}
+  </div>
+</div>
+
+<div class="rv-acties">
+  <input type="text" name="notitie" value="{{ w.yml.get('review_notitie','') }}" placeholder="Notitie (bijv. beeld 3 hoort bij Extrema; merk = Lichtjes; jaar = 2017)">
+  <button class="ok" name="actie" value="ok" title="Sneltoets: a">✓ Klopt</button>
+  <button class="primair" name="actie" value="aangepast">✎ Aangepast, opslaan</button>
+  <button class="fout" name="actie" value="fout">✗ Klopt niet</button>
+  <button name="actie" value="" id="alleen-opslaan">Alleen opslaan</button>
+  {% if status %}<button name="actie" value="reset" class="klein">status wissen</button>{% endif %}
+</div>
+</form>
+<p class="muted klein">Sneltoetsen (buiten een tekstveld): <b>←</b>/<b>→</b> vorige/volgende · <b>a</b> = klopt. Klik op een beeld om te vergroten. Hoort een beeld/post bij een ander werk? Kies het werk onder het beeld (of typ een nieuwe naam) en sla op; het wordt alleen <b>gemarkeerd</b>, Claude voert het later uit. <a href="{{ url_for('verplaats_lijst') }}">Alle markeringen</a></p>
+
+<script>
+document.querySelectorAll('input.verpl').forEach(i => i.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); document.getElementById('alleen-opslaan').click(); }
+}));
+document.addEventListener('keydown', e => {
+  const t = e.target.tagName;
+  if (t === 'TEXTAREA' || t === 'INPUT' || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === 'ArrowLeft' && document.getElementById('vorige')) location = document.getElementById('vorige').href;
+  if (e.key === 'ArrowRight' && document.getElementById('volgende')) location = document.getElementById('volgende').href;
+  if (e.key === 'a') document.querySelector('button.ok').click();
+  if (e.key === 'Escape') document.querySelectorAll('img.groot').forEach(i => i.classList.remove('groot'));
+});
+</script>
+{% endblock %}

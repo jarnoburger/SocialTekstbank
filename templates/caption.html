@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block titel %}Caption · {{ g.start|datum }} · {{ w.mapnaam if w else 'post' }}{% endblock %}
+{% block inhoud %}
+<style>
+.cv-nav{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px}.cv-nav .ruimte{flex:1}
+.cv-grid{display:grid;grid-template-columns:1fr 1fr 1.15fr;gap:14px;align-items:start}
+.cv-kol{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:12px 14px}
+.cv-kol h2{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+.cv-beelden{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px;margin-bottom:10px}
+.cv-beelden img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;background:var(--chip);cursor:zoom-in}
+.cv-beelden img.groot{position:fixed;inset:4vh 4vw;width:92vw;height:92vh;object-fit:contain;z-index:20;background:rgba(0,0,0,.85);cursor:zoom-out}
+.cv-tekst{white-space:pre-wrap;font-size:14px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:4px 0 10px}
+.cv-bron{font-size:12px;color:var(--muted)}
+.cv-taal{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
+.cv-taal b{font-size:13px}
+.cv-kol textarea{min-height:190px;font-size:14px}
+.cv-teller{font-size:12px;color:var(--muted)}.cv-teller.te-lang{color:var(--bad);font-weight:600}
+.cv-tags button{font-size:12px;padding:2px 9px;border-radius:20px;margin:2px 3px 2px 0}
+.cv-tags button.laag{border-color:var(--warn);color:var(--warn)}
+.cv-tags button.eigen{border-color:var(--accent);color:var(--accent)}
+.cv-notitie{border-left:4px solid var(--warn);background:var(--chip);padding:7px 11px;border-radius:7px;font-size:13px;margin:6px 0}
+.cv-acties{position:sticky;bottom:0;background:var(--bg);padding:10px 0;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.cv-acties input[type=text]{flex:1;min-width:260px}
+button.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+button.klein{font-size:12px;padding:2px 8px}
+@media (max-width:1100px){.cv-grid{grid-template-columns:1fr}}
+</style>
+
+<div class="cv-nav klein">
+  <a href="{{ url_for('captions_lijst', **nav) }}">← lijst</a>
+  {% if positie[0] > 0 %}<span class="muted">{{ positie[0] }} / {{ positie[1] }} in “{{ nav.filter }}”</span>{% endif %}
+  <span class="ruimte"></span>
+  {% if vorige %}<a class="knop" id="vorige" href="{{ url_for('caption', gid=vorige, **nav) }}">← vorige</a>{% endif %}
+  {% if volgende %}<a class="knop" id="volgende" href="{{ url_for('caption', gid=volgende, **nav) }}">volgende →</a>{% endif %}
+  {% if w %}<a class="knop" href="{{ url_for('review', pid=w.pid) }}">review werk</a><a class="knop" href="{{ url_for('werk', pid=w.pid) }}">werk bewerken</a>{% endif %}
+</div>
+
+<h1>{{ g.start|datum }} · {% if w %}{{ w.mapnaam }}{% else %}<span class="muted">niet gekoppeld</span>{% endif %}
+  <span class="muted klein">{{ g.merk }} · {{ g.soort }} · {{ g.accounts|join(', ') }}{% if w %} · {{ w.jaar or 'jaar ?' }}{% endif %}</span>
+  {% if it.status == 'klaar' %}<span class="chip ok">✓ klaar</span>{% elif it.status == 'concept' %}<span class="chip warn">concept</span>{% elif it.status == 'overslaan' %}<span class="chip">overgeslagen</span>{% else %}<span class="chip warn">open</span>{% endif %}
+</h1>
+
+<form method="post" id="cvform">
+<div class="cv-grid">
+
+  <!-- 1. Bestaand -->
+  <div class="cv-kol">
+    <h2>1 · Bestaande caption</h2>
+    {% if r.beelden %}<div class="cv-beelden">{% for b in r.beelden[:6] %}<img src="{{ url_for('beeld', batch=b.src.split('/')[0], map_=b.src.split('/')[1], bestand=b.bestand) }}" alt="" onclick="this.classList.toggle('groot')">{% endfor %}</div>{% endif %}
+    {% for p in g.posts %}
+      <div class="cv-bron"><span class="chip">{{ p.platform|upper }}</span> {{ p.account }} · {{ p.timestamp|datum }} · {{ p.media_type|lower }} · <a href="{{ p.permalink }}" target="_blank" rel="noopener">open post</a></div>
+      {% if loop.index0 > 0 and p.caption.strip() and p.caption.strip() == g.posts[0].caption.strip() %}<div class="muted klein" style="margin-bottom:8px">zelfde caption als hierboven</div>
+      {% else %}<div class="cv-tekst" id="bestaand{{ loop.index0 }}">{{ p.caption.strip() or '⚠ geen caption' }}</div>{% endif %}
+    {% endfor %}
+    {% if g.captions %}<button type="button" class="klein" onclick="neem('bestaand0','beste_nl')">bestaande → beste NL</button>{% endif %}
+
+    {% if w %}
+    <details style="margin-top:10px" {% if not g.captions %}open{% endif %}><summary class="klein"><b>Context van het werk</b></summary>
+      <div class="klein" style="white-space:pre-wrap;margin-top:6px">{% for veld in ['Titel','Jaar en plek','Kort','Credits'] %}{% if t.velden.get(veld) %}<b>{{ veld }}:</b> {{ t.velden[veld]|linkify }}
+{% endif %}{% endfor %}{% if alts_post %}<b>Op de beelden van deze post:</b>
+{% for a in alts_post %}- {{ a }}
+{% endfor %}{% endif %}</div>
+    </details>
+    {% endif %}
+  </div>
+
+  <!-- 2. Claude -->
+  <div class="cv-kol">
+    <h2>2 · Voorstel Claude{% if it.claude.ronde %} <span class="muted">· ronde {{ it.claude.ronde }}{% if it.claude.datum %} · {{ it.claude.datum }}{% endif %}</span>{% endif %}</h2>
+    {% if it.claude.nl or it.claude.en %}
+      {% for taal, label in [('nl','NL'),('en','EN')] %}
+      <div class="cv-taal"><b>{{ label }}</b>{% if it.claude[taal] %}<button type="button" class="klein" onclick="neem('claude_{{ taal }}','beste_{{ taal }}')">→ beste {{ label }}</button>{% endif %}</div>
+      <div class="cv-tekst" id="claude_{{ taal }}">{{ it.claude[taal] or '—' }}</div>
+      {% endfor %}
+      {% if it.claude.notitie %}<div class="cv-notitie"><b>Claude:</b> {{ it.claude.notitie }}</div>{% endif %}
+      {% if it.claude.tags %}<div class="klein muted">Gebruikte tags: {{ it.claude.tags|join(' ') }}</div>{% endif %}
+    {% else %}
+      <p class="muted klein">Nog geen voorstel. Vraag Claude om een ronde: <code>tools\caption_context.py</code> exporteert de context, Claude schrijft, <code>tools\schrijf_captions.py --doe</code> zet het hier.</p>
+    {% endif %}
+  </div>
+
+  <!-- 3. Beste versie -->
+  <div class="cv-kol">
+    <h2>3 · Beste versie <span class="muted">(van jou)</span></h2>
+    <div class="cv-tags klein" style="margin-bottom:6px">
+      <span class="muted">Klik = invoegen bij de cursor:</span><br>
+      <button type="button" class="eigen" data-tag="{{ eigen }}">{{ eigen }}</button><button type="button" data-tag="{{ andere }}" title="ander merk">{{ andere }}</button>
+      {% for x in tags %}<button type="button" class="{{ 'laag' if 'laag' in x.zek or 'middel' in x.zek }}" data-tag="{{ x.h }}" title="{{ x.wie }}{% if x.zek %} · zekerheid {{ x.zek }}{% endif %}">{{ x.h }}</button>{% endfor %}
+      {% for h in hashtags %}<button type="button" data-tag="{{ h }}">{{ h }}</button>{% endfor %}
+    </div>
+    {% for taal, label in [('nl','NL'),('en','EN')] %}
+    <div class="cv-taal"><b>{{ label }}</b><span class="cv-teller" data-voor="beste_{{ taal }}"></span></div>
+    <textarea name="beste_{{ taal }}" id="beste_{{ taal }}" placeholder="Neem over uit 1 of 2 en pas aan, of schrijf zelf">{{ it.beste[taal] if it.beste else '' }}</textarea>
+    {% endfor %}
+    {% if crosslinks %}
+    <details class="klein" style="margin-top:8px"><summary>Crosslinks ({{ crosslinks|length }})</summary>
+      {% for c in crosslinks %}<div style="margin-top:4px">{{ c.regel|linkify }}</div>{% endfor %}
+    </details>
+    {% endif %}
+  </div>
+</div>
+
+<div class="cv-acties">
+  <input type="text" name="feedback" value="{{ it.feedback or '' }}" placeholder="Feedback voor Claude (volgende ronde): bijv. korter, geen hashtags, tag ook de fotograaf, toon minder formeel">
+  <button class="ok" name="actie" value="klaar" title="Sneltoets: k">✓ Klaar</button>
+  <button class="primair" name="actie" value="concept">Concept opslaan</button>
+  <button name="actie" value="overslaan">Overslaan</button>
+  {% if w %}<button name="actie" value="naar_werk" title="Zet beste NL/EN als Caption NL/EN in _tekst.md van het werk">→ Caption van werk</button>{% endif %}
+  {% if it.status %}<button name="actie" value="reset" class="klein">status wissen</button>{% endif %}
+</div>
+</form>
+<p class="muted klein">Sneltoetsen (buiten een tekstveld): <b>←</b>/<b>→</b> vorige/volgende · <b>k</b> = klaar · <b>1</b>/<b>2</b> = Claude NL/EN overnemen. Klik op een beeld om te vergroten. Oranje tag = zekerheid laag/middel, eerst checken. Teller: IG max 2200 tekens, 30 hashtags, 20 @tags.</p>
+
+<script>
+let laatste = document.getElementById('beste_nl');
+document.querySelectorAll('textarea').forEach(t => t.addEventListener('focus', () => { if (t.id.startsWith('beste_')) laatste = t; }));
+function neem(van, naar) {
+  const bron = document.getElementById(van), doel = document.getElementById(naar);
+  if (!bron || !doel) return;
+  const nieuw = bron.innerText.trim();
+  if (doel.value.trim() && doel.value.trim() !== nieuw && !confirm('Beste versie overschrijven?')) return;
+  doel.value = nieuw; tel(doel); doel.focus();
+}
+document.querySelectorAll('.cv-tags button').forEach(b => b.addEventListener('click', () => {
+  const t = laatste, tag = b.dataset.tag, s = t.selectionStart ?? t.value.length, e = t.selectionEnd ?? s;
+  const voor = t.value.slice(0, s), na = t.value.slice(e);
+  const spatie = voor && !/\s$/.test(voor) ? ' ' : '';
+  t.value = voor + spatie + tag + (na && !/^\s/.test(na) ? ' ' : '') + na;
+  const pos = (voor + spatie + tag).length; t.focus(); t.setSelectionRange(pos, pos); tel(t);
+}));
+function tel(t) {
+  const el = document.querySelector(`.cv-teller[data-voor="${t.id}"]`); if (!el) return;
+  const n = t.value.length, h = (t.value.match(/#\w+/g) || []).length, a = (t.value.match(/(^|\s)@[\w.]+/g) || []).length;
+  el.textContent = `${n} tekens · ${h} # · ${a} @`;
+  el.classList.toggle('te-lang', n > 2200 || h > 30 || a > 20);
+}
+document.querySelectorAll('textarea[id^=beste_]').forEach(t => { tel(t); t.addEventListener('input', () => tel(t)); });
+document.addEventListener('keydown', e => {
+  const tg = e.target.tagName;
+  if (tg === 'TEXTAREA' || tg === 'INPUT' || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === 'ArrowLeft' && document.getElementById('vorige')) location = document.getElementById('vorige').href;
+  if (e.key === 'ArrowRight' && document.getElementById('volgende')) location = document.getElementById('volgende').href;
+  if (e.key === 'k') document.querySelector('button.ok').click();
+  if (e.key === '1') neem('claude_nl', 'beste_nl');
+  if (e.key === '2') neem('claude_en', 'beste_en');
+  if (e.key === 'Escape') document.querySelectorAll('img.groot').forEach(i => i.classList.remove('groot'));
+});
+</script>
+{% endblock %}

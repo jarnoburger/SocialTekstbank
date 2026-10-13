@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block titel %}Planning · SocialTekstbank{% endblock %}
+{% block inhoud %}
+<style>
+.pn-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.pn-tabs button{flex:1;min-width:160px;font-size:16px;padding:10px 14px;border-radius:9px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;text-align:left}
+.pn-tabs button.actief{border:2px solid var(--accent)}
+.pn-lijst{list-style:none;margin:0;padding:0}
+.pn-item{display:grid;grid-template-columns:120px 1fr;gap:12px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:6px 12px;margin-bottom:6px}
+.pn-titel{display:block;font-size:16px;font-weight:600;color:var(--ink);margin-bottom:4px}
+.pn-item.gepost{opacity:.5}
+.pn-item.sleep{opacity:.4;border-style:dashed}
+.pn-greep{display:flex;flex-direction:row;align-items:center;gap:6px}
+.pn-greep .nr{font-size:20px;font-weight:700}
+.pn-greep span.hand{cursor:grab;font-size:20px;color:var(--muted)}
+.pn-greep button{width:36px;padding:2px 0}
+.pn-kop{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.pn-beelden{display:flex;gap:4px;overflow-x:auto}
+.pn-beelden img{height:37px;border-radius:4px;background:var(--chip);flex:none}
+.pn-tekst{white-space:pre-wrap;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:15px;max-height:12rem;overflow:auto}
+.pn-knop{font-size:15px;padding:8px 14px;border-radius:8px;border:1px solid var(--line);background:var(--chip);color:var(--ink);cursor:pointer}
+.pn-knop.primair{background:var(--accent);border-color:var(--accent);color:#fff}
+.pn-knop.aan{background:var(--ok);border-color:var(--ok);color:#fff}
+</style>
+
+<h1>Planning</h1>
+<p class="muted">Sleep (☰) of gebruik ▲▼ om de volgorde te bepalen: bovenaan = eerst posten. Volgorde wordt direct bewaard.</p>
+
+<div class="pn-tabs">
+{% for k in kolommen %}
+  <button data-doel="{{ k.doel }}" class="{{ 'actief' if k.doel==actief }}" onclick="toon('{{ k.doel }}')">
+    <b>{{ k.naam }}</b><br><span class="klein">{{ k.open }} te posten · {{ k['items']|length }} totaal</span></button>
+{% endfor %}
+</div>
+
+{% for k in kolommen %}
+<ul class="pn-lijst" id="lijst-{{ k.doel }}" data-doel="{{ k.doel }}" style="{{ '' if k.doel==actief else 'display:none' }}">
+  {% for x in k['items'] %}
+  <li class="pn-item {{ 'gepost' if x.gepost }}" draggable="true" data-pid="{{ x.w.pid }}">
+    <div class="pn-greep">
+      <span class="nr"></span>
+      <span class="hand" title="sleep">☰</span>
+      <button onclick="schuif(this,-1)" title="omhoog">▲</button>
+      <button onclick="schuif(this,1)" title="omlaag">▼</button>
+    </div>
+    <div>
+      <a class="pn-titel" href="{{ url_for('plan_werk', pid=x.w.pid, filter='alle') }}">{{ x.w.mapnaam }}</a>
+      {% if x.beelden %}<div class="pn-beelden">{% for b in x.beelden %}<img src="{{ b }}" loading="lazy" draggable="false">{% endfor %}</div>{% endif %}
+    </div>
+  </li>
+  {% else %}
+  <li class="muted">Nog niets gepland voor {{ k.naam }}. Vink in <a href="{{ url_for('plannen') }}">Plannen</a> "Posten op {{ k.naam }}" aan en klik Klaar.</li>
+  {% endfor %}
+</ul>
+{% endfor %}
+
+<script>
+function toon(doel) {
+  document.querySelectorAll('.pn-lijst').forEach(l => l.style.display = l.dataset.doel === doel ? '' : 'none');
+  document.querySelectorAll('.pn-tabs button').forEach(b => b.classList.toggle('actief', b.dataset.doel === doel));
+  history.replaceState(null, '', '?doel=' + doel);
+}
+function nummer(lijst) { [...lijst.querySelectorAll('.pn-item')].forEach((li, i) => li.querySelector('.nr').textContent = i + 1); }
+async function bewaar(data) {
+  const r = await fetch('{{ url_for("planning") }}', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)});
+  return r.ok;
+}
+function bewaarVolgorde(lijst) {
+  nummer(lijst);
+  bewaar({doel: lijst.dataset.doel, volgorde: [...lijst.querySelectorAll('.pn-item')].map(li => li.dataset.pid)});
+}
+function schuif(knop, r) {
+  const li = knop.closest('.pn-item'), lijst = li.parentElement;
+  const ander = r < 0 ? li.previousElementSibling : li.nextElementSibling;
+  if (!ander) return;
+  r < 0 ? lijst.insertBefore(li, ander) : lijst.insertBefore(ander, li);
+  bewaarVolgorde(lijst);
+}
+async function kopieer(knop) {
+  const t = knop.closest('.pn-item').querySelector('.pn-tekst').innerText;
+  try { await navigator.clipboard.writeText(t); }
+  catch (e) { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+  const oud = knop.textContent; knop.textContent = '✓ Gekopieerd'; setTimeout(() => knop.textContent = oud, 2000);
+}
+async function gepost(knop) {
+  const li = knop.closest('.pn-item'), aan = !knop.classList.contains('aan');
+  if (!await bewaar({doel: li.parentElement.dataset.doel, gepost: li.dataset.pid, aan})) { knop.textContent = 'Opslaan mislukt'; return; }
+  knop.classList.toggle('aan', aan); knop.textContent = aan ? '✓ Gepost' : 'Gepost'; li.classList.toggle('gepost', aan); verberg();
+}
+function verberg() {
+  const v = document.getElementById('verberg').checked;
+  document.querySelectorAll('.pn-item').forEach(li => li.style.display = v && li.classList.contains('gepost') ? 'none' : '');
+}
+
+// slepen
+let sleep = null;
+document.querySelectorAll('.pn-lijst').forEach(lijst => {
+  nummer(lijst);
+  lijst.addEventListener('dragstart', e => { sleep = e.target.closest('.pn-item'); sleep.classList.add('sleep'); });
+  lijst.addEventListener('dragend', () => { if (sleep) { sleep.classList.remove('sleep'); bewaarVolgorde(lijst); sleep = null; } });
+  lijst.addEventListener('dragover', e => {
+    e.preventDefault();
+    const doel = e.target.closest('.pn-item');
+    if (!sleep || !doel || doel === sleep || doel.parentElement !== lijst) return;
+    const r = doel.getBoundingClientRect();
+    lijst.insertBefore(sleep, e.clientY < r.top + r.height / 2 ? doel : doel.nextSibling);
+  });
+});
+</script>
+{% endblock %}

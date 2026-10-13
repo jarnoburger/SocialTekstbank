@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block titel %}Captions{% endblock %}
+{% block inhoud %}
+<style>
+.cl-thumb{width:64px;height:64px;object-fit:cover;border-radius:6px;background:var(--chip);display:block}
+.cl-tekst{white-space:pre-wrap;font-size:13px;max-height:90px;overflow:hidden}
+td.smal{width:1%;white-space:nowrap}
+</style>
+<h1>Caption-vergelijker <span class="muted klein">bestaande caption ↔ voorstel Claude ↔ beste versie · per post (IG+FB-tweeling = één rij)</span></h1>
+
+<div class="filters">
+  {% for f, label in [('open','Te beoordelen'),('nieuw','Nog geen voorstel'),('feedback','Met feedback voor Claude'),('concept','Concept'),('klaar','Klaar'),('overslaan','Overgeslagen'),('geen_caption','Nu zonder caption'),('alle','Alle')] %}
+  <a href="{{ url_for('captions_lijst', filter=f, merk=merk, account=account) }}" class="{{ 'actief' if filt==f }}">{{ label }} ({{ tel[f] }})</a>
+  {% endfor %}
+</div>
+<div class="filters klein">
+  <span class="muted">Merk:</span>
+  <a href="{{ url_for('captions_lijst', filter=filt, account=account) }}" class="{{ 'actief' if not merk }}">alle</a>
+  {% for m in merken %}<a href="{{ url_for('captions_lijst', filter=filt, merk=m, account=account) }}" class="{{ 'actief' if merk==m }}">{{ m }}</a>{% endfor %}
+  <span class="muted" style="margin-left:12px">Account:</span>
+  <a href="{{ url_for('captions_lijst', filter=filt, merk=merk) }}" class="{{ 'actief' if not account }}">alle</a>
+  {% for a in accounts %}<a href="{{ url_for('captions_lijst', filter=filt, merk=merk, account=a) }}" class="{{ 'actief' if account==a }}">{{ a }}</a>{% endfor %}
+</div>
+
+{% if not rijen %}
+<p class="muted">Niets in deze lijst.{% if filt == 'open' %} Claude-voorstellen komen via <code>tools\caption_context.py</code> → Claude → <code>tools\schrijf_captions.py --doe</code>.{% endif %}</p>
+{% else %}
+<table>
+<tr><th></th><th>Datum</th><th>Werk</th><th>Bestaande caption</th><th>Voorstel Claude (NL)</th><th>Status</th></tr>
+{% for r in rijen %}
+{% set u = url_for('caption', gid=r.g.gid, filter=filt, merk=merk, account=account) %}
+<tr>
+  <td class="smal"><a href="{{ u }}">{% if r.beelden %}<img class="cl-thumb" loading="lazy" src="{{ url_for('beeld', batch=r.beelden[0].src.split('/')[0], map_=r.beelden[0].src.split('/')[1], bestand=r.beelden[0].bestand) }}" alt="">{% else %}<span class="cl-thumb"></span>{% endif %}</a></td>
+  <td class="smal"><a href="{{ u }}">{{ r.g.start|datum }}</a><br><span class="chip">{{ r.g.soort }}</span><br><span class="muted klein">{{ r.g.merk }}</span></td>
+  <td>{% if r.w %}<a href="{{ url_for('werk', pid=r.w.pid) }}">{{ r.w.mapnaam }}</a>{% else %}<span class="muted">niet gekoppeld</span>{% endif %}</td>
+  <td><div class="cl-tekst">{{ (r.g.captions[0] if r.g.captions else '')|kort(220) or '⚠ geen caption' }}</div></td>
+  <td><div class="cl-tekst">{% if r.heeft_claude %}{{ (r.it.claude.nl or r.it.claude.en)|kort(220) }}{% else %}<span class="muted">—</span>{% endif %}</div></td>
+  <td class="smal">
+    {% if r.status == 'klaar' %}<span class="chip ok">✓ klaar</span>{% elif r.status == 'concept' %}<span class="chip warn">concept</span>{% elif r.status == 'overslaan' %}<span class="chip">overgeslagen</span>{% elif r.heeft_claude %}<span class="chip warn">te beoordelen</span>{% else %}<span class="chip">nieuw</span>{% endif %}
+    {% if r.feedback %}<br><span class="chip nee" title="{{ r.feedback }}">feedback</span>{% endif %}
+    {% if r.it.claude and r.it.claude.ronde and r.it.claude.ronde > 1 %}<br><span class="muted klein">ronde {{ r.it.claude.ronde }}</span>{% endif %}
+  </td>
+</tr>
+{% endfor %}
+</table>
+{% endif %}
+{% endblock %}

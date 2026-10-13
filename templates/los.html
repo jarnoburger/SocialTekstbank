@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block titel %}Los uitzoeken · {{ r.naam }}{% endblock %}
+{% block inhoud %}
+<style>
+.ls-nav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.ls-groot{font-size:16px;padding:9px 18px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+.ls-groot.primair{background:var(--accent);border-color:var(--accent);color:#fff}
+.ls-groot.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.ls-groot.weg{border-color:var(--bad)}
+.ls-groot.uit{opacity:.35;pointer-events:none}
+.ls-raster{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+@media (max-width:1000px){.ls-raster{grid-template-columns:1fr}}
+.ls-blok{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:14px 16px;margin-bottom:14px}
+.ls-blok h2{margin:0 0 10px;font-size:16px}
+.ls-groot-beeld{width:100%;max-height:62vh;object-fit:contain;background:var(--bg);border-radius:8px}
+.ls-match{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.ls-match img{width:130px;height:100px;object-fit:cover;border-radius:6px;background:var(--chip);flex:none}
+.ls-soort{display:inline-block;padding:2px 9px;border-radius:12px;font-size:13px;background:var(--chip)}
+.ls-soort.dubbel{background:var(--warn);color:#fff}.ls-soort.match{background:var(--ok);color:#fff}
+select,input[type=text]{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:8px 10px;width:100%}
+.ls-knoppen{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+</style>
+
+<h1 style="margin:0 0 6px">_Los uitzoeken</h1>
+<p class="muted" style="margin:0 0 12px">Nog open: <b>{{ open_n }}</b> van {{ n }} ·
+  dubbel {{ tel.dubbel }} · match {{ tel.match }} · onbekend {{ tel.onbekend }} · video {{ tel.video }}
+  {% if beslist %} · beslist: {% for k, v in beslist.items() %}{{ k }} {{ v }}{{ ', ' if not loop.last }}{% endfor %}{% endif %}
+  · <a href="{{ url_for('los_namen') }}"><b>→ namen en groepen (raster)</b></a>
+  <br>Hier wordt alleen gemarkeerd. Verplaatsen gebeurt daarna in één keer, na jouw akkoord.</p>
+
+<div class="ls-nav">
+  <a class="ls-groot {{ '' if vorige is not none else 'uit' }}" id="vorige" href="{{ url_for('los_item', i=vorige, filter=filt) if vorige is not none else '#' }}">← Vorige</a>
+  <b style="font-size:17px">{{ i + 1 }} / {{ n }}</b>
+  <a class="ls-groot {{ '' if volgende is not none else 'uit' }}" id="volgende" href="{{ url_for('los_item', i=volgende, filter=filt) if volgende is not none else '#' }}">Volgende →</a>
+  <span style="margin-left:auto">
+    <a class="knop {{ 'primair' if filt=='open' }}" href="{{ url_for('los_item', i=i, filter='open') }}">alleen open</a>
+    <a class="knop {{ 'primair' if filt=='alle' }}" href="{{ url_for('los_item', i=i, filter='alle') }}">alle</a>
+  </span>
+</div>
+
+<div class="ls-raster">
+  <div class="ls-blok">
+    <h2>{{ r.naam }} <span class="muted klein">· {{ r.merk }} · {{ (r.size / 1024)|round|int }} KB</span>
+      <span class="ls-soort {{ r.soort }}">{{ {'dubbel':'staat al in een werkmap','match':'lijkt op werk/post','onbekend':'geen match','video':'video'}[r.soort] }}</span></h2>
+    {% if r.type == 'img' %}<img class="ls-groot-beeld" src="{{ bestand_url }}">
+    {% else %}<video class="ls-groot-beeld" src="{{ bestand_url }}" controls preload="metadata"></video>{% endif %}
+    {% if gekozen %}<p style="color:var(--ok)">Gekozen: <b>{{ gekozen.actie }}</b>
+      {% if gekozen.pid and wm.get(gekozen.pid) %}→ {{ wm[gekozen.pid].mapnaam }}{% endif %}{% if gekozen.naam %}→ nieuw werk "{{ gekozen.naam }}"{% endif %}</p>{% endif %}
+  </div>
+
+  <div>
+    <div class="ls-blok">
+      <h2>Gevonden overeenkomsten</h2>
+      {% for x in r.werk %}
+        {% set w = wm.get(x.pid) %}{% set m = (w.media|selectattr('rel','equalto',x.rel)|first) if w else none %}
+        <div class="ls-match">
+          {% if m and not m.cloud %}<img src="{{ url_for('origineel', pid=x.pid, rel=x.rel) }}" loading="lazy">
+          {% else %}<span class="muted klein" style="width:130px">(in de cloud)</span>{% endif %}
+          <div><b>{{ x.werk }}</b><br><span class="muted klein">werkfoto {{ x.rel }} · verschil {{ x.afstand }}/64</span></div>
+        </div>
+      {% endfor %}
+      {% for x in r.online %}
+        <div class="ls-match">
+          {% if x.thumb %}<img src="{{ x.thumb }}" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">{% endif %}
+          <div><b>{{ x.werk or '?' }}</b><br><span class="muted klein">online · {{ x.account }} · {{ x.datum }} · verschil {{ x.afstand }}/64</span>
+            <br><a href="{{ x.permalink }}" target="_blank" rel="noopener">↗ post</a></div>
+        </div>
+      {% endfor %}
+      {% if not r.werk and not r.online %}<p class="muted">Geen overeenkomst gevonden{{ ' (video’s zijn niet vergeleken)' if r.type != 'img' }}.</p>{% endif %}
+      {% if r.twijfel %}<p style="color:var(--warn)">Let op: lijkt op meerdere werken.</p>{% endif %}
+    </div>
+
+    <form method="post" class="ls-blok">
+      <h2>Wat doen we ermee?</h2>
+      <label class="muted klein">Hoort bij werk</label>
+      <select name="pid" id="pid">
+        {% set kies = gekozen.pid or r.voorstel %}
+        <option value="">— kies een werk —</option>
+        {% for w in werken %}<option value="{{ w.pid }}" {{ 'selected' if w.pid == kies }}>{{ w.merk }} · {{ w.mapnaam }}{{ ' (promoted)' if '_Promoted' in w.pad }}{{ ' ← voorstel' if w.pid == r.voorstel }}</option>{% endfor %}
+      </select>
+      <div class="ls-knoppen">
+        <button class="ls-groot ok" name="actie" value="werk">✓ Naar dit werk</button>
+        <button class="ls-groot primair" name="actie" value="promote" title="eigen nieuw werk in _To Promote (naam: tekstvak hieronder, of de bestandsnaam)">★ To Promote</button>
+        {% if r.werk %}<button class="ls-groot" name="actie" value="dubbel" title="staat al in de werkmap; los exemplaar mag weg">Dubbel (staat er al)</button>{% endif %}
+        <button class="ls-groot weg" name="actie" value="weg">Niet nodig</button>
+        <button class="ls-groot" name="actie" value="later">Later</button>
+        {% if gekozen %}<button class="ls-groot" name="actie" value="reset">Reset</button>{% endif %}
+      </div>
+      <label class="muted klein" style="display:block;margin-top:12px">Of: nieuw werk (mapnaam, bv. "2023 Naam")</label>
+      <div style="display:flex;gap:8px"><input type="text" name="nieuw" placeholder="JJJJ Naam">
+        <button class="ls-groot" name="actie" value="nieuw">+ Nieuw werk</button></div>
+      <p class="muted klein">"★ To Promote" = eigen nieuw werk in <code>{{ r.merk }}\_To Promote</code>, met de naam uit dit tekstvak (leeg = bestandsnaam).
+        "Dubbel" en "Niet nodig" gaan later naar <code>_Los\_to_delete</code> (niets wordt gewist).</p>
+    </form>
+  </div>
+</div>
+
+<script>
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input,textarea,select')) return;
+  const a = e.key === 'ArrowRight' ? 'volgende' : e.key === 'ArrowLeft' ? 'vorige' : null;
+  const el = a && document.getElementById(a);
+  if (el && !el.classList.contains('uit')) location.href = el.href;
+});
+</script>
+{% endblock %}

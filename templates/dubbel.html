@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block titel %}Mogelijk dubbel{% endblock %}
+{% block inhoud %}
+<style>
+.db-groep{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:14px}
+.db-groep.beslist{opacity:.75}
+.db-leden{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin:8px 0}
+.db-lid{border:1px solid var(--line);border-radius:9px;padding:8px}
+.db-beelden{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:6px}
+.db-beelden img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:5px;background:var(--chip);cursor:zoom-in}
+.db-beelden img.groot{position:fixed;inset:4vh 4vw;width:92vw;height:92vh;aspect-ratio:auto;object-fit:contain;z-index:20;background:rgba(0,0,0,.85);cursor:zoom-out}
+.db-acties{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.db-acties input[type=text]{flex:1;min-width:200px}
+</style>
+<h1>Mogelijk dubbel <span class="muted klein">werken die mogelijk één en hetzelfde zijn · je besluit wordt alleen opgeslagen, Claude voegt later samen (met proefrun)</span></h1>
+<div class="filters">
+  {% for f, label in [('open','Open'),('beslist','Beslist'),('alle','Alle')] %}
+  <a href="{{ url_for('dubbel', filter=f) }}" class="{{ 'actief' if filt==f }}">{{ label }} ({{ tel[f] }})</a>
+  {% endfor %}
+</div>
+{% if not groepen %}<p class="muted">Niets in deze lijst.</p>{% endif %}
+{% for g in groepen %}
+<div class="db-groep{{ ' beslist' if g.besluit }}" id="{{ g.id }}">
+  <div><b>{{ g.id }}</b> · <span class="muted">{{ g.reden }}</span>
+    {% if g.besluit %}
+      {% if g.besluit.besluit == 'samen' %}<span class="chip ok">samenvoegen in: {% for l in g.leden if l.w.pid == g.besluit.doel %}{{ l.w.mapnaam }}{% endfor %}</span>
+      {% elif g.besluit.besluit == 'niet' %}<span class="chip">niet dubbel</span>{% else %}<span class="chip warn">twijfel</span>{% endif %}
+      {% if g.besluit.notitie %}<span class="muted klein"> · {{ g.besluit.notitie }}</span>{% endif %}
+    {% endif %}
+  </div>
+  <div class="db-leden">
+    {% for l in g.leden %}
+    <div class="db-lid">
+      <a href="{{ url_for('review', pid=l.w.pid) }}"><b>{{ l.w.mapnaam }}</b></a>
+      <div class="muted klein">{{ l.w.merk }} · {{ l.w.jaar or 'jaar ?' }} · {{ l.w.n_img }} foto's · {{ l.w.n_vid }} video's · {{ l.n_posts }} posts</div>
+      <div class="db-beelden">{% for b in l.beelden %}<img loading="lazy" src="{{ b }}" alt="" onclick="this.classList.toggle('groot')">{% else %}<span class="muted klein">geen beelden</span>{% endfor %}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <form method="post" action="{{ url_for('dubbel', filter=filt) }}" class="db-acties">
+    <input type="hidden" name="gid" value="{{ g.id }}">
+    <select name="doel" title="Bij samenvoegen: in welk werk komt alles terecht?">
+      {% for l in g.leden %}<option value="{{ l.w.pid }}" {{ 'selected' if g.besluit and g.besluit.doel == l.w.pid }}>{{ l.w.mapnaam }}</option>{% endfor %}
+    </select>
+    <button class="primair" name="actie" value="samen">Samenvoegen in ↑</button>
+    <button name="actie" value="niet">Niet dubbel</button>
+    <button name="actie" value="twijfel">Twijfel</button>
+    <input type="text" name="notitie" value="{{ g.besluit.notitie if g.besluit else '' }}" placeholder="Notitie (bijv. alleen Build + Projection samen; Robot is overkoepelend)">
+    {% if g.besluit %}<button name="actie" value="reset" class="klein">wissen</button>{% endif %}
+  </form>
+</div>
+{% endfor %}
+<script>document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('img.groot').forEach(i => i.classList.remove('groot')); });</script>
+{% endblock %}

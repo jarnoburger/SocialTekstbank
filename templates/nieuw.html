@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block titel %}Nieuw materiaal · {{ w.mapnaam }}{% endblock %}
+{% block inhoud %}
+<style>
+.nw-nav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.nw-groot{font-size:16px;padding:9px 18px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+.nw-groot.ja{background:var(--ok);border-color:var(--ok);color:#fff}
+.nw-groot.nee{border-color:var(--bad)}
+.nw-groot.uit{opacity:.35;pointer-events:none}
+.nw-blok{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:14px 16px;margin-bottom:14px}
+.nw-blok h2{margin:0 0 10px;font-size:16px}
+.nw-raster{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:16px}
+@media (max-width:1000px){.nw-raster{grid-template-columns:1fr}}
+.nw-media{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.nw-item{background:var(--bg);border:2px solid var(--line);border-radius:8px;padding:5px}
+.nw-item.aan{border-color:var(--ok)}
+.nw-item img,.nw-item video{width:100%;height:150px;object-fit:cover;border-radius:6px;background:var(--chip)}
+.nw-item label{display:flex;gap:6px;align-items:center;font-size:13px;margin-top:4px;cursor:pointer}
+.nw-advies{padding:10px 12px;border-radius:8px;background:var(--chip);margin-bottom:10px}
+.nw-advies.ja{border-left:5px solid var(--ok)}.nw-advies.nee{border-left:5px solid var(--bad)}
+textarea,input[type=text]{width:100%;font:16px/1.5 system-ui,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+textarea{min-height:11rem}
+.nw-checks label{display:inline-flex;gap:8px;align-items:center;font-size:16px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;margin:4px 6px 4px 0;background:var(--bg)}
+.nw-zoom{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:50}
+.nw-zoom img,.nw-zoom video{max-width:94vw;max-height:94vh}
+</style>
+
+<form method="post">
+<div class="nw-nav">
+  <a class="nw-groot {{ '' if vorige else 'uit' }}" id="vorige" href="{{ url_for('nieuw_werk', sleutel=vorige, filter=filt) if vorige else '#' }}">← Vorige</a>
+  <b style="font-size:17px">{{ positie[0] }} / {{ positie[1] }}</b>
+  <a class="nw-groot {{ '' if volgende else 'uit' }}" id="volgende" href="{{ url_for('nieuw_werk', sleutel=volgende, filter=filt) if volgende else '#' }}">Volgende →</a>
+  <span class="muted">nog te beslissen: {{ tel.open }} van {{ tel.alle }} werken</span>
+  <span style="margin-left:auto">
+    <a class="knop {{ 'primair' if filt=='open' }}" href="{{ url_for('nieuw_werk', sleutel=sleutel, filter='open') }}">alleen open</a>
+    <a class="knop {{ 'primair' if filt=='alle' }}" href="{{ url_for('nieuw_werk', sleutel=sleutel, filter='alle') }}">alle</a>
+  </span>
+</div>
+
+<h1 style="margin:0 0 4px">{{ w.mapnaam }}</h1>
+<p class="muted" style="margin:0 0 12px">{{ w.merk }} · {{ '_Promoted' if '_Promoted' in w.pad else '_To Promote' }} · {{ media|length }} nieuwe bestanden ·
+  al gepost: {% for d, naam, pf, acc in doelen %}{{ naam }} {{ '✓' ~ gepost[d]|length if gepost[d] else '—' }}{{ ', ' if not loop.last }}{% endfor %}
+  {% if gekozen %} · <b style="color:var(--ok)">besloten: {{ gekozen.besluit }}</b>{% endif %}</p>
+
+<div class="nw-raster">
+  <div class="nw-blok">
+    <h2>Nieuw materiaal — vink aan wat in de post moet (volgorde = zoals hier)</h2>
+    <div class="nw-media">
+    {% for m in media %}
+      <div class="nw-item {{ 'aan' if m.gekozen }}">
+        {% if m.video %}<video src="{{ m.url }}#t=1" preload="metadata" muted onclick="zoom('{{ m.url }}','vid')"></video>
+        {% else %}<img src="{{ m.url }}" loading="lazy" onclick="zoom('{{ m.url }}','img')">{% endif %}
+        <label><input type="checkbox" name="bestand" value="{{ m.naam }}" {{ 'checked' if m.gekozen }}
+          onchange="this.closest('.nw-item').classList.toggle('aan', this.checked)">
+          {{ '🎬 ' if m.video }}{{ m.naam[:26] }}</label>
+      </div>
+    {% endfor %}
+    </div>
+  </div>
+
+  <div>
+    <div class="nw-blok">
+      <div class="nw-advies {{ conc.advies }}"><b>Advies Claude: {{ (conc.advies or '?')|upper }}</b> — {{ conc.reden or 'geen concept' }}
+        {% if conc.vraag %}<br><b style="color:var(--warn)">Vraag:</b> {{ conc.vraag }}{% endif %}</div>
+      <label class="muted klein">Tekst voor de nieuwe post (Engels) — concept van Claude, pas gerust aan</label>
+      <textarea name="caption_en">{{ caption_en }}</textarea>
+      <label class="muted klein">Hashtags</label>
+      <input type="text" name="hashtags" value="{{ hashtags|replace('\n', ' ') }}">
+      {% if oud_caption and oud_caption != caption_en %}
+      <details style="margin-top:8px"><summary class="muted">tekst van de eerdere post (wordt bewaard onder 'Eerdere captions')</summary>
+        <div style="white-space:pre-wrap;padding:6px 0">{{ oud_caption }}</div></details>{% endif %}
+      <div class="nw-checks" style="margin-top:10px">
+        {% for d, naam, pf, acc in doelen %}<label><input type="checkbox" name="doel_{{ d }}" value="1" {{ 'checked' if (gekozen.doelen is defined and d in gekozen.doelen) or (not gekozen and conc.advies != 'nee') }}> Posten op {{ naam }}</label>{% endfor %}
+      </div>
+      <div class="nw-nav" style="margin:10px 0 0">
+        <button class="nw-groot ja" name="actie" value="ja">✓ Ja, nieuwe post → Planning</button>
+        <button class="nw-groot nee" name="actie" value="nee">✗ Nee, geen post</button>
+        {% if gekozen %}<button class="nw-groot" name="actie" value="reset">Reset</button>{% endif %}
+      </div>
+      <p class="muted klein">Bij <b>Ja</b>: de tekst komt in <code>_tekst.md</code> (oude tekst blijft bewaard), het werk komt in Planning,
+        en staat het in <code>_Promoted</code>, dan gaat de map terug naar <code>_To Promote</code>. Na posten gaat hij vanzelf weer naar <code>_Promoted</code>.</p>
+    </div>
+  </div>
+</div>
+</form>
+<div class="nw-zoom" id="zoom" onclick="this.style.display='none';this.innerHTML=''"></div>
+<script>
+function zoom(src, t) {
+  const z = document.getElementById('zoom');
+  z.innerHTML = t === 'img' ? `<img src="${src}">` : `<video src="${src}" controls autoplay></video>`;
+  z.style.display = 'flex';
+}
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input,textarea,select')) return;
+  const a = e.key === 'ArrowRight' ? 'volgende' : e.key === 'ArrowLeft' ? 'vorige' : null;
+  const el = a && document.getElementById(a);
+  if (el && !el.classList.contains('uit')) location.href = el.href;
+});
+</script>
+{% endblock %}

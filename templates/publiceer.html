@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block titel %}Publiceer · SocialTekstbank{% endblock %}
+{% block inhoud %}
+<style>
+.pb-stappen{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.pb-stappen a{flex:1;min-width:180px;padding:10px 14px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink)}
+.pb-stappen a.actief{border:2px solid var(--accent)}
+.pb-stappen a.af{opacity:.6}
+.pb-stappen b{display:block;font-size:15px}
+.pb-nav{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.pb-nav .groot{font-size:17px;padding:10px 20px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+.pb-nav .groot.primair{background:var(--accent);border-color:var(--accent);color:#fff}
+.pb-nav .uit{opacity:.35;pointer-events:none}
+.pb-thumbs{display:flex;gap:8px;margin:6px 0 14px}
+.pb-thumbs img{width:120px;height:120px;object-fit:cover;border-radius:8px;background:var(--chip)}
+.pb-blok{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:16px 18px;max-width:820px}
+.pb-tekst{white-space:pre-wrap;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;
+  padding:12px 14px;font-size:16px;line-height:1.5;max-height:24rem;overflow:auto}
+.pb-kopie{font-size:17px;padding:12px 18px;margin:12px 0;border-radius:8px;border:0;background:var(--accent);color:#fff;cursor:pointer;width:100%}
+.pb-kopie.ok{background:var(--ok)}
+.pb-post{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--line)}
+.pb-post .open{font-size:16px;padding:9px 16px;border:1px solid var(--accent);border-radius:8px}
+.pb-gedaan{font-size:16px;padding:9px 18px;border-radius:8px;border:1px solid var(--line);background:var(--chip);color:var(--ink);cursor:pointer}
+.pb-gedaan.aan{background:var(--ok);border-color:var(--ok);color:#fff}
+.pb-oud{width:100%;color:var(--ink);font-size:13px}
+.pb-oud summary{color:var(--muted);cursor:pointer}
+.pb-oud div{white-space:pre-wrap;padding:6px 0}
+</style>
+
+<div class="pb-stappen">
+{% for s in stappen %}
+  <a href="{{ url_for('publiceer', stap=s.id, filter=filt) }}" class="{{ 'actief' if s.id==stap }} {{ 'af' if not s.open }}">
+    <span class="muted klein">Stap {{ loop.index }}</span><b>{{ s.naam }}</b>
+    <span class="klein">{% if s.open %}{{ s.open }} van {{ s.posts }} open{% else %}✓ klaar ({{ s.posts }}){% endif %}</span>
+  </a>
+{% endfor %}
+</div>
+
+{% if x %}
+<div class="pb-nav">
+  <a class="groot {{ '' if vorige else 'uit' }}" id="vorige" href="{{ url_for('publiceer_werk', stap=stap, pid=vorige, filter=filt) if vorige else '#' }}">← Vorige</a>
+  <b style="font-size:17px">{{ stap_naam }} · {{ positie[0] }} / {{ positie[1] }}</b>
+  {% if volgende %}
+  <a class="groot primair" id="volgende" href="{{ url_for('publiceer_werk', stap=stap, pid=volgende, filter=filt) }}">Volgende →</a>
+  {% elif volgende_stap %}
+  <a class="groot primair" id="volgende" href="{{ url_for('publiceer', stap=volgende_stap, filter=filt) }}">Naar volgende stap →</a>
+  {% else %}
+  <a class="groot uit" id="volgende" href="#">Volgende →</a>
+  {% endif %}
+  <span style="margin-left:auto">
+    <a class="knop {{ 'primair' if filt=='open' }}" href="{{ url_for('publiceer_werk', stap=stap, pid=x.pid, filter='open') }}">alleen open</a>
+    <a class="knop {{ 'primair' if filt=='alle' }}" href="{{ url_for('publiceer_werk', stap=stap, pid=x.pid, filter='alle') }}">alle</a>
+  </span>
+</div>
+
+<h1>{{ x.w.mapnaam }} <a class="klein" href="{{ url_for('caption_werk', pid=x.pid) }}">tekst aanpassen</a></h1>
+{% if x.thumbs %}<div class="pb-thumbs">{% for t in x.thumbs %}<img src="{{ t }}" referrerpolicy="no-referrer" onerror="this.style.display='none'">{% endfor %}</div>{% endif %}
+
+<div class="pb-blok">
+  <div class="pb-tekst" id="tekst">{{ x.tekst }}</div>
+  <button class="pb-kopie" onclick="kopieer(this)">📋 Kopieer tekst</button>
+  {% for r in x.posts %}
+  <div class="pb-post">
+    <a class="open" href="{{ r.p.permalink }}" target="_blank" rel="noopener">↗ Open post</a>
+    <span>{{ r.p.account }} · {{ r.p.timestamp[:10] }}</span>
+    <button class="pb-gedaan {{ 'aan' if r.gedaan }}" data-key="{{ r.p.key }}" onclick="gedaan(this)">{{ '✓ Gedaan' if r.gedaan else 'Gedaan' }}</button>
+    {% if r.oud %}<details class="pb-oud"><summary>huidige tekst online</summary><div>{{ r.oud }}</div></details>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+<p class="muted klein">Toetsen: ← vorige · → volgende.</p>
+{% else %}
+<h1>Publiceer</h1>
+<p>Niets meer open in deze stap.</p>
+{% endif %}
+
+<script>
+async function kopieer(knop) {
+  const t = document.getElementById('tekst').innerText, oud = knop.textContent;
+  try { await navigator.clipboard.writeText(t); }
+  catch (e) {
+    const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy'); ta.remove();
+  }
+  knop.classList.add('ok'); knop.textContent = '✓ Gekopieerd';
+  setTimeout(() => { knop.classList.remove('ok'); knop.textContent = oud; }, 2000);
+}
+async function gedaan(knop) {
+  const aan = !knop.classList.contains('aan');
+  const fd = new FormData(); fd.append('key', knop.dataset.key); fd.append('gedaan', aan ? '1' : '0');
+  const r = await fetch('{{ url_for("publiceer") }}', {method: 'POST', body: fd});
+  if (!r.ok) { knop.textContent = 'Opslaan mislukt'; return; }
+  knop.classList.toggle('aan', aan); knop.textContent = aan ? '✓ Gedaan' : 'Gedaan';
+}
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input,textarea')) return;
+  const a = e.key === 'ArrowRight' ? 'volgende' : e.key === 'ArrowLeft' ? 'vorige' : null;
+  const el = a && document.getElementById(a);
+  if (el && !el.classList.contains('uit')) location.href = el.href;
+});
+</script>
+{% endblock %}
