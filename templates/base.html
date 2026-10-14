@@ -41,6 +41,11 @@
   </div>
 </header>
 <main>
+<!-- Bevroren 2026-10-14: fase 2 (Nieuw/Plannen/Planning/Posten) verhuist naar Honey (stap 11b). -->
+<div style="background:#F5E3B3;color:#6B4E08;padding:8px 12px;border-radius:8px;margin:8px 0;font-size:14px">
+  <b>Fase 2 staat stil.</b> De rij (Planning + Posten) zit nu in Honey: <a href="http://127.0.0.1:5055/social">Social-tab</a>.
+  Gebruik hier geen Nieuw / Plannen / Planning / Posten meer - wijzigingen komen niet in Honey.
+</div>
 {% with berichten = get_flashed_messages(with_categories=true) %}
   {% for cat, b in berichten %}<div class="flash {{ cat }}">{{ b }}</div>{% endfor %}
 {% endwith %}

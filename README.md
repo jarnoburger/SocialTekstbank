@@ -1,5 +1,7 @@
 # SocialTekstbank
 
+> **Bevroren 2026-10-14:** fase 2 (Nieuw, Plannen, Planning, Posten) is verhuisd naar Honey (stap 11b, Social-tab). Deze app nog alleen voor fase 1 (aanvullen). Export voor Honey: `python tools\export_voor_honey.py`.
+
 Lokale web-app die de **tekst bij je werk** verzamelt en je socials (SJB en Lichtjes, IG en FB) controleert.
 
 - **Lokaal:** scant de `_To Promote`-mappen en laat per werk zien of er een korte tekst, een lange tekst en een caption is.
